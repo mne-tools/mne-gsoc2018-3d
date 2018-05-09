@@ -1,0 +1,19 @@
+name: mne-gsoc2018-3d
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python>=3.6
+  - pip
+  - mkl
+  - numpy
+  - scipy
+  - pandas
+  - pytest
+  - pytest-cov
+  - sphinx
+  - flake8
+  - ipyvolume
+  - ipywidgets
+  - pip:
+    - mne
