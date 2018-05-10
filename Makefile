@@ -66,12 +66,6 @@ flake:
 	fi;
 	@echo "flake8 passed"
 
-codespell:  # running manually
-	@codespell -w -i 3 -q 3 -S $(CODESPELL_SKIPS) -D ./dictionary.txt $(CODESPELL_DIRS)
-
-codespell-error:  # running on travis
-	@codespell -i 0 -q 7 -S $(CODESPELL_SKIPS) -D ./dictionary.txt $(CODESPELL_DIRS)
-
 pydocstyle:
 	@echo "Running pydocstyle"
 	@pydocstyle

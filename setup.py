@@ -1,8 +1,8 @@
 #! /usr/bin/env python
 from setuptools import setup, find_packages
 
-DISTNAME = 'mne-gsoc2018-3d'
-DESCRIPTION = 'Interactive 3D visualizations of human brain activity in the Jupyter Notebook'
+DISTNAME = 'mne_g3d'
+DESCRIPTION = 'Interactive 3D visualizations of human brain activity in the Jupyter Notebook.'
 AUTHOR = 'Oleh Kozynets'
 URL = 'https://github.com/mne-tools/mne-gsoc2018-3d'
 LICENSE = 'BSD (3-clause)'
