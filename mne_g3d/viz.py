@@ -9,14 +9,14 @@ def read_brain_mesh(surface_path: str):
 
     Parameters
     ----------
-    surface_path: :obj: `str`
+    surface_path: str
         Path to the brain surface.
 
     Returns
     -------
-    :obj: `numpy.array`
+    vertices : numpy.array
         Array of vertex (x, y, z) coordinates, of size number_of_vertices x 3.
-    :obj: `numpy.array`
+    faces : numpy.array
         Array defining mesh triangles, of size number_of_faces x 3.
 
     """
@@ -40,23 +40,23 @@ def plot_brain_mesh(rh_vertices=None,
 
     Parameters
     ----------
-    rh_vertices : :obj: `numpy.array`, optional
+    rh_vertices : numpy.array, optional
         Array of right hemisphere vertex (x, y, z) coordinates, of size
         number_of_vertices x 3. Default is None.
-    lh_vertices : :obj: `numpy.array`, optional
+    lh_vertices : numpy.array, optional
         Array of left hemisphere vertex (x, y, z) coordinates, of size
         number_of_vertices x 3. Default is None.
-    rh_faces : :obj: `numpy.array`, optional
+    rh_faces : numpy.array, optional
         Array defining right hemisphere mesh triangles, of size
         number_of_faces x 3. Default is None.
-    lh_faces : :obj: `numpy.array`, optional
+    lh_faces : numpy.array, optional
         Array defining mesh triangles, of size number_of_faces x 3.
         Default is None.
-    rh_color : :obj: `str`, :obj: `numpy.array`, optional
+    rh_color : str | numpy.array, optional
         Color for each point/vertex/symbol of the right hemisphere,
         can be string format, examples for red:’red’, ‘#f00’, ‘#ff0000’ or
         ‘rgb(1,0,0), or rgb array of shape (N, 3). Default value is 'grey'.
-    lh_color : :obj: `str`, :obj: `numpy.array`, optional
+    lh_color : str | numpy.array, optional
         Color for each point/vertex/symbol of the left hemisphere,
         can be string format, examples for red:’red’, ‘#f00’, ‘#ff0000’ or
         ‘rgb(1,0,0), or rgb array of shape (N, 3). Default value is 'grey'.
@@ -71,11 +71,11 @@ def plot_brain_mesh(rh_vertices=None,
 
     Returns
     -------
-    :obj: `ipyvolume.Figure`
+    fig : ipyvolume.Figure
         Ipyvolume object presenting the figure.
-    :obj: `ipyvolume.Mesh`
+    rh_mesh : ipyvolume.Mesh
         Ipyvolume object presenting the built mesh for right hemisphere.
-    :obj: `ipyvolume.Mesh`
+    lh_mesh : ipyvolume.Mesh
         Ipyvolume object presenting the built mesh for right hemisphere.
 
     """
@@ -105,18 +105,18 @@ def plot_hemisphere_mesh(vertices, faces,  color='grey'):
 
     Parameters
     ----------
-    vertices : :obj: `numpy.array`
+    vertices : numpy.array
         Array of vertex (x, y, z) coordinates, of size number_of_vertices x 3.
-    faces : :obj: `numpy.array`
+    faces : numpy.array
         Array defining mesh triangles, of size number_of_faces x 3.
-    color : :obj: `str`, :obj: `numpy.array`, optional
+    color : str | numpy.array, optional
         Color for each point/vertex/symbol, can be string format, examples for
         red:’red’, ‘#f00’, ‘#ff0000’ or ‘rgb(1,0,0), or rgb array of
         shape (N, 3). Default value is 'grey'.
 
     Returns
     -------
-    :obj: `ipyvolume.Mesh`
+    mesh_widget : ipyvolume.Mesh
         Ipyvolume object presenting the built mesh.
 
     """
