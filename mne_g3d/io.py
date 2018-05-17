@@ -3,7 +3,7 @@ import numpy as np
 
 
 def read_brain_mesh(surface_path):
-    u"""Function reads triangular format Freesurfer brain surface.
+    u"""Read triangular format Freesurfer brain surface.
 
     Parameters
     ----------
@@ -24,8 +24,7 @@ def read_brain_mesh(surface_path):
 
 
 def read_morph(morph_path):
-    u"""Function reads brain hemisphere morphometry data, which should
-    be provided as Freesurfer 'curv' file.
+    u"""Read brain hemisphere morphometry data from Freesurfer 'curv' file.
 
     Parameters
     ----------
