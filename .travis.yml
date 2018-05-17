@@ -1,0 +1,11 @@
+dist: trusty
+language: python
+cache: pip
+python:
+  - 3.6
+sudo: false
+install:
+  - pip install flake8 codespell pydocstyle ipyvolume nibabel
+script:
+  - make pep
+  - python -c "import mne_g3d"  # just a smoke test for now
