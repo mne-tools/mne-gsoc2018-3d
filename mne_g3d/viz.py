@@ -4,8 +4,8 @@ import nibabel
 import numpy as np
 
 
-def read_brain_mesh(surface_path: str):
-    """Function reads triangular format Freesurfer brain surface.
+def read_brain_mesh(surface_path):
+    u"""Read triangular format Freesurfer brain surface.
 
     Parameters
     ----------
@@ -18,9 +18,7 @@ def read_brain_mesh(surface_path: str):
         Array of vertex (x, y, z) coordinates, of size number_of_vertices x 3.
     faces : numpy.array
         Array defining mesh triangles, of size number_of_faces x 3.
-
     """
-
     vertices, faces = nibabel.freesurfer.read_geometry(surface_path)
     faces = faces.astype(np.uint32)
 
@@ -36,7 +34,7 @@ def plot_brain_mesh(rh_vertices=None,
                     fig_size=(500, 500),
                     azimuth=90,
                     elevation=90):
-    """Function for plotting triangular format Freesurfer surface of the brain.
+    u"""Plot triangular format Freesurfer surface of the brain.
 
     Parameters
     ----------
@@ -79,7 +77,6 @@ def plot_brain_mesh(rh_vertices=None,
         Ipyvolume object presenting the built mesh for right hemisphere.
 
     """
-
     rh_mesh = None
     lh_mesh = None
 
@@ -100,8 +97,7 @@ def plot_brain_mesh(rh_vertices=None,
 
 
 def plot_hemisphere_mesh(vertices, faces,  color='grey'):
-    """Function for plotting triangular format Freesurfer surface of the
-    brain hemispheres.
+    u"""Plot triangular format Freesurfer surface of the brain hemispheres.
 
     Parameters
     ----------
@@ -118,9 +114,7 @@ def plot_hemisphere_mesh(vertices, faces,  color='grey'):
     -------
     mesh_widget : ipyvolume.Mesh
         Ipyvolume object presenting the built mesh.
-
     """
-
     x = vertices[:, 0]
     y = vertices[:, 1]
     z = vertices[:, 2]

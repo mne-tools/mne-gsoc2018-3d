@@ -1,0 +1,10 @@
+dist: trusty
+language: python
+python:
+  - 3.6
+sudo: false
+install:
+  - pip install flake8 codespell pydocstyle
+script:
+  - make pep
+  - python -c "import mne_g3d"
