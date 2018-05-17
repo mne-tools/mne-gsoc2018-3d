@@ -59,7 +59,7 @@ trailing-spaces:
 flake:
 	@if command -v flake8 > /dev/null; then \
 		echo "Running flake8"; \
-		flake8 --count mne examples tutorials; \
+		flake8 --count mne_g3d; \
 	else \
 		echo "flake8 not found, please install it!"; \
 		exit 1; \
