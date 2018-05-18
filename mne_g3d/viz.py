@@ -1,28 +1,5 @@
 import ipyvolume as ipv
 from ipyvolume.pylab import style
-import nibabel
-import numpy as np
-
-
-def read_brain_mesh(surface_path):
-    u"""Read triangular format Freesurfer brain surface.
-
-    Parameters
-    ----------
-    surface_path: str
-        Path to the brain surface.
-
-    Returns
-    -------
-    vertices : numpy.array
-        Array of vertex (x, y, z) coordinates, of size number_of_vertices x 3.
-    faces : numpy.array
-        Array defining mesh triangles, of size number_of_faces x 3.
-    """
-    vertices, faces = nibabel.freesurfer.read_geometry(surface_path)
-    faces = faces.astype(np.uint32)
-
-    return vertices, faces
 
 
 def plot_brain_mesh(rh_vertices=None,
@@ -75,7 +52,6 @@ def plot_brain_mesh(rh_vertices=None,
         Ipyvolume object presenting the built mesh for right hemisphere.
     lh_mesh : ipyvolume.Mesh
         Ipyvolume object presenting the built mesh for right hemisphere.
-
     """
     rh_mesh = None
     lh_mesh = None
