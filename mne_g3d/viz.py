@@ -1,6 +1,8 @@
 import ipyvolume as ipv
 from ipyvolume.pylab import style
 
+from ._utils import offset_hemi
+
 
 def plot_brain_mesh(rh_vertices=None,
                     lh_vertices=None,
@@ -8,6 +10,7 @@ def plot_brain_mesh(rh_vertices=None,
                     lh_faces=None,
                     rh_color='grey',
                     lh_color='grey',
+                    offset=0.0,
                     fig_size=(500, 500),
                     azimuth=90,
                     elevation=90):
@@ -35,6 +38,10 @@ def plot_brain_mesh(rh_vertices=None,
         Color for each point/vertex/symbol of the left hemisphere,
         can be string format, examples for red:’red’, ‘#f00’, ‘#ff0000’ or
         ‘rgb(1,0,0), or rgb array of shape (N, 3). Default value is 'grey'.
+    offset : float | int | None, optional
+        If 0.0, the surface will be offset such that the medial wall is
+        aligned with the origin. If not 0.0, an additional offset will
+        be used. If None no offset will be applied.
     fig_size : (int, int), optional
         Width and height of the figure. Default is (500, 500).
     azimuth : int, optional
@@ -59,9 +66,15 @@ def plot_brain_mesh(rh_vertices=None,
     fig = ipv.figure(width=fig_size[0], height=fig_size[1], lighting=True)
 
     if (rh_vertices is not None) and (rh_faces is not None):
+        if offset is not None:
+            rh_vertices = offset_hemi(rh_vertices, 'rh', offset)
+
         rh_mesh = plot_hemisphere_mesh(rh_vertices, rh_faces, rh_color)
 
     if (lh_vertices is not None) and (lh_faces is not None):
+        if offset is not None:
+            lh_vertices = offset_hemi(lh_vertices, 'lh', offset)
+
         lh_mesh = plot_hemisphere_mesh(lh_vertices, lh_faces, lh_color)
 
     style.use('minimal')
