@@ -42,7 +42,7 @@ def read_morph(morph_path):
 
     # morphometry (curvature) normalization in order to get gray cortex
     color = (morph_data > 0).astype(float)
-    color = (color - 0.5) / 3 + 0.5
+    color = 0.5 - (color - 0.5) / 3
     color = color[:, np.newaxis] * [1, 1, 1]
 
     return morph_data, color
