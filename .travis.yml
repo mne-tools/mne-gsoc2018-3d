@@ -5,7 +5,7 @@ python:
   - 3.6
 sudo: false
 install:
-  - pip install flake8 codespell pydocstyle ipyvolume nibabel
+  - pip install codespell flake8 ipyvolume matplotlib mne numpy nibabel pydocstyle pythreejs scipy
 script:
   - make pep
   - python -c "import mne_g3d"  # just a smoke test for now

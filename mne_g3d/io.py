@@ -1,5 +1,6 @@
 from nibabel import freesurfer
 import numpy as np
+from mne import read_source_estimate
 
 
 def read_brain_mesh(surface_path):
@@ -46,3 +47,34 @@ def read_morph(morph_path):
     color = color[:, np.newaxis] * [1, 1, 1]
 
     return morph_data, color
+
+
+def read_activation_data(stc_path, subject_name, subjects_dir=None):
+    u"""Read signal activation data.
+
+    Parameters
+    ----------
+    path : str
+        Path to a source-estimate file.
+    subject_name : str
+        Name of the subject.
+    subjects_dir : str
+        Path to SUBJECTS_DIR if it is not set in the environment.
+
+    Returns
+    -------
+    act_data : {"lh": numpy.array, "rh": numpy.array}
+        Activation data for each hemisphere.
+    """
+    stc = read_source_estimate(stc_path)
+    stc.crop(0.09, 0.09)
+    stc = stc.morph(subject_name,
+                    grade=None,
+                    smooth=10,
+                    subjects_dir=subjects_dir,
+                    subject_from=subject_name)
+
+    act_data = dict(lh=stc.data[:len(stc.vertices[0]), 0],
+                    rh=stc.data[len(stc.vertices[0]):, 0])
+
+    return act_data
