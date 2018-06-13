@@ -1,11 +1,9 @@
 import ipyvolume as ipv
-import matplotlib.pyplot as plt
-from matplotlib.colors import ListedColormap
 import numpy as np
 from pythreejs import (BlendFactors, BlendingMode, Equations, ShaderMaterial,
                        Side)
 
-from ._utils import offset_hemi
+from ._utils import get_mesh_cmap, offset_hemi
 
 
 def plot_brain_mesh(rh_vertices=None,
@@ -15,6 +13,7 @@ def plot_brain_mesh(rh_vertices=None,
                     rh_color='grey',
                     lh_color='grey',
                     act_data=None,
+                    cmap_str='auto',
                     offset=0.0,
                     fig_size=(500, 500),
                     azimuth=90,
@@ -45,6 +44,8 @@ def plot_brain_mesh(rh_vertices=None,
         ‘rgb(1,0,0), or rgb array of shape (N, 3). Default value is 'grey'.
     act_data : {"lh": numpy.array, "rh": numpy.array}, optional
         Dictionary with activation data for each hemisphere.
+    cmap_str : "hot" | "mne" | auto", optional
+        Which color map to use. Default value is "auto".
     offset : float | int | None, optional
         If 0.0, the surface will be offset such that the medial wall is
         aligned with the origin. If not 0.0, an additional offset will
@@ -73,11 +74,30 @@ def plot_brain_mesh(rh_vertices=None,
     fig = ipv.figure(width=fig_size[0], height=fig_size[1], lighting=True)
 
     if act_data is not None:
-        rh_act_data = act_data.get('rh')
-        lh_act_data = act_data.get('lh')
+        cmap = get_mesh_cmap(act_data, cmap_str=cmap_str)
+        # data mapping into [0, 1] interval
+        arr_act_data = np.concatenate(tuple(act_data.values()))
+        dt_min = arr_act_data.min()
+        dt_max = arr_act_data.max()
+
+        out_min = 0
+        out_max = 1
+
+        k = (out_max - out_min) / (dt_max - dt_min)
+        b = out_max - k * dt_max
+
+        rh_act_data = k * act_data.get('rh') + b
+        lh_act_data = k * act_data.get('lh') + b
+
+        rh_act_data[rh_act_data < 0] = 0
+        lh_act_data[lh_act_data < 0] = 0
+
+        rh_act_data[rh_act_data > 1] = 1.0
+        lh_act_data[lh_act_data > 1] = 1.0
     else:
         rh_act_data = None
         lh_act_data = None
+        cmap = None
 
     if (rh_vertices is not None) and (rh_faces is not None):
         if offset is not None:
@@ -86,7 +106,8 @@ def plot_brain_mesh(rh_vertices=None,
         rh_mesh, _ = plot_hemisphere_mesh(rh_vertices,
                                           rh_faces,
                                           rh_color,
-                                          act_data=rh_act_data)
+                                          act_data=rh_act_data,
+                                          cmap=cmap)
 
     if (lh_vertices is not None) and (lh_faces is not None):
         if offset is not None:
@@ -95,7 +116,8 @@ def plot_brain_mesh(rh_vertices=None,
         lh_mesh, _ = plot_hemisphere_mesh(lh_vertices,
                                           lh_faces,
                                           lh_color,
-                                          act_data=lh_act_data)
+                                          act_data=lh_act_data,
+                                          cmap=cmap)
 
     ipv.style.box_off()
     ipv.style.axes_off()
@@ -108,7 +130,11 @@ def plot_brain_mesh(rh_vertices=None,
     return fig, rh_mesh, lh_mesh
 
 
-def plot_hemisphere_mesh(vertices, faces,  color='grey', act_data=None):
+def plot_hemisphere_mesh(vertices,
+                         faces,
+                         color='grey',
+                         act_data=None,
+                         cmap=None):
     u"""Plot triangular format Freesurfer surface of the brain hemispheres.
 
     Parameters
@@ -123,6 +149,8 @@ def plot_hemisphere_mesh(vertices, faces,  color='grey', act_data=None):
         shape (N, 3). Default value is 'grey'.
     act_data : numpy.array, optional
         Activation data for the given hemispere.
+    cmap : matplotlib.ListedColormap, optional
+        Color map with alpha-channel.
 
     Returns
     -------
@@ -140,37 +168,8 @@ def plot_hemisphere_mesh(vertices, faces,  color='grey', act_data=None):
 
     mesh_overlay = None
     # Add mesh overlay and plot data on top of it
-    if act_data is not None:
-        if act_data.min() >= 0:
-            cmap = plt.get_cmap('hot')
-            # map data to the 0,1 range
-            act_data -= act_data.min()
-            act_data /= act_data.max()
-            act_data[act_data > 1.] = 1.
-
-            cmap_alpha = cmap(np.arange(cmap.N))
-            # Set alpha and create new colormap
-            alpha_channel = [(cmap.N - i) / cmap.N
-                             for i in reversed(range(0, cmap.N))]
-            cmap_alpha[:, -1] = alpha_channel
-            cmap_alpha = ListedColormap(cmap_alpha)
-        else:
-            cmap = plt.get_cmap('RdBu_r')
-            # map data to the 0,1 range
-            act_data -= act_data.min()
-            act_data /= act_data.max()
-            act_data[act_data > 1.] = 1.
-
-            half_len = int(cmap.N / 2)
-            cmap_alpha = cmap(np.arange(cmap.N))
-
-            # Set alpha and create new colormap
-            alpha_channel = [abs(half_len - i) / half_len
-                             for i in range(0, cmap.N)]
-            cmap_alpha[:, -1] = alpha_channel
-            cmap_alpha = ListedColormap(cmap_alpha)
-
-        act_colors = cmap_alpha(act_data.ravel())
+    if (act_data is not None) and (cmap is not None):
+        act_colors = cmap(act_data)
 
         mesh_overlay = ipv.plot_trisurf(x,
                                         y,
