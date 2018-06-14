@@ -100,12 +100,20 @@ def get_mesh_cmap(act_data, cmap_str='auto'):
         out_cmap = cmap(np.arange(cmap.N))
         alphas = np.ones(cmap.N)
         step = (scale_pts[-1] - scale_pts[0]) / cmap.N
+        # coefficients for linear mapping into [0, 1]
+        k_pos = 1 / (ctrl_pts[1] - ctrl_pts[0])
+        k_neg = -k_pos
+        b = - ctrl_pts[0] * k_pos
 
         for i in range(0, cmap.N):
             curr_pos = i * step + scale_pts[0]
 
             if (curr_pos > -ctrl_pts[0]) and (curr_pos < ctrl_pts[0]):
                 alphas[i] = 0
+            elif (curr_pos >= ctrl_pts[0]) and (curr_pos < ctrl_pts[1]):
+                alphas[i] = k_pos * curr_pos + b
+            elif (curr_pos <= -ctrl_pts[0]) and (curr_pos > -ctrl_pts[1]):
+                alphas[i] = k_neg * curr_pos + b
 
     alphas[alphas > 1] = 1.0
     out_cmap[:, -1] = alphas
