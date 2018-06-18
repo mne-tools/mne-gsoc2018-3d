@@ -63,7 +63,7 @@ def read_activation_data(stc_path, subject_name, subjects_dir=None):
 
     Returns
     -------
-    act_data : {"lh": numpy.array, "rh": numpy.array}
+    act_data : numpy.array
         Activation data for each hemisphere.
     """
     stc = read_source_estimate(stc_path)
@@ -74,7 +74,4 @@ def read_activation_data(stc_path, subject_name, subjects_dir=None):
                     subjects_dir=subjects_dir,
                     subject_from=subject_name)
 
-    act_data = dict(lh=stc.data[:len(stc.vertices[0]), 0],
-                    rh=stc.data[len(stc.vertices[0]):, 0])
-
-    return act_data
+    return stc.data[:, 0]
