@@ -1,12 +1,17 @@
+import os.path as path
+
 import ipyvolume as ipv
 from matplotlib import cm
 from matplotlib.colors import ListedColormap
+from mne.source_estimate import SourceEstimate
+from mne.utils import _check_subject, get_subjects_dir
 from mne.viz._3d import _limits_to_control_points
 import numpy as np
 from pythreejs import (BlendFactors, BlendingMode, Equations, ShaderMaterial,
                        Side)
 
 from ._utils import offset_hemi
+from .io import read_brain_mesh, read_morph
 
 
 def plot_brain_mesh(rh_vertices=None,
@@ -233,3 +238,211 @@ def plot_hemisphere_mesh(vertices,
         mesh_overlay.material = mat
 
     return mesh_widget, mesh_overlay
+
+
+def plot_source_estimates(stc, subject=None, surface='inflated', hemi='lh',
+                          colormap='auto', smoothing_steps=10,
+                          transparent=None, alpha=1.0, subjects_dir=None,
+                          views='lat', clim='auto', figure=None, size=800,
+                          background='black'):
+    u"""Plot SourceEstimates with ipyvolume.
+
+    Parameters
+    ----------
+    stc : SourceEstimates
+        The source estimates to plot.
+    subject : str | None
+        The subject name corresponding to FreeSurfer environment
+        variable SUBJECT. If None stc.subject will be used. If that
+        is None, the environment will be used.
+    surface : str
+        The type of surface (inflated, white etc.).
+    hemi : str, 'lh' | 'rh' | 'split' | 'both'
+        The hemisphere to display.
+    colormap : str | np.ndarray of float, shape(n_colors, 3 | 4)
+        Name of colormap to use or a custom look up table. If array, must
+        be (n x 3) or (n x 4) array for with RGB or RGBA values between
+        0 and 255. Default is 'hot'.
+    smoothing_steps : int
+        The amount of smoothing
+    transparent : bool | None
+        If True, use a linear transparency between fmin and fmid.
+        None will choose automatically based on colormap type. Has no effect
+        with mpl backend.
+    alpha : float
+        Alpha value to apply globally to the overlay. Has no effect with mpl
+        backend.
+    subjects_dir : str
+        The path to the freesurfer subjects reconstructions.
+        It corresponds to Freesurfer environment variable SUBJECTS_DIR.
+    views : str | list
+        View to use. It must be one of ["lat", "med", "fos", "cau", "dor",
+        "ven", "fro", "par"].
+    clim : str | dict
+        Colorbar properties specification. If 'auto', set clim automatically
+        based on data percentiles. If dict, should contain:
+            ``kind`` : 'value' | 'percent'
+                Flag to specify type of limits.
+            ``lims`` : list | np.ndarray | tuple of float, 3 elements
+                Note: Only use this if 'colormap' is not 'mne'.
+                Left, middle, and right bound for colormap.
+        Unlike :meth:`stc.plot <mne.SourceEstimate.plot>`, it cannot use
+        ``pos_lims``, as the surface plot must show the magnitude.
+    size : float or pair of floats
+        The size of the window, in pixels. can be one number to specify
+        a square window, or the (width, height) of a rectangular window.
+        Has no effect with mpl backend.
+    background : matplotlib color
+        Color of the background of the display window.
+
+    Returns
+    -------
+    figure : ipyvolume.Figure
+        An instance of ipyvolume figure.
+    """
+    if not isinstance(stc, SourceEstimate):
+        raise ValueError('stc has to be a surface source estimate')
+
+    views_dict = {'lat': {'elev': 5, 'azim': 0},
+                  'med': {'elev': 5, 'azim': 180},
+                  'fos': {'elev': 5, 'azim': 90},
+                  'cau': {'elev': 5, 'azim': -90},
+                  'dor': {'elev': 90, 'azim': 0},
+                  'ven': {'elev': -90, 'azim': 0},
+                  'fro': {'elev': 5, 'azim': 110},
+                  'par': {'elev': 5, 'azim': -110}}
+
+    if views not in views_dict:
+        raise ValueError('Views must be one of ["lat", "med", "fos", "cau", '
+                         '"dor", "ven", "fro", "par"]. Got {0}.'.format(views))
+
+    subjects_dir = get_subjects_dir(subjects_dir=subjects_dir,
+                                    raise_error=True)
+    subject = _check_subject(stc.subject, subject, True)
+
+    if hemi not in ['lh', 'rh', 'split', 'both']:
+        raise ValueError('hemi has to be either "lh", "rh", "split", '
+                         'or "both"')
+
+    stc.crop(0.09, 0.09)
+    stc = stc.morph(subject,
+                    grade=None,
+                    smooth=smoothing_steps,
+                    subjects_dir=subjects_dir,
+                    subject_from=subject)
+
+    if isinstance(size, int):
+        fig_w = size
+        fig_h = size
+    else:
+        fig_w, fig_h = size
+
+    # convert control points to locations in colormap
+    ctrl_pts, lim_cmap, scale_pts, transparent = _limits_to_control_points(
+        clim, stc.data[:, 0], colormap, transparent, fmt='matplotlib')
+
+    if hemi in ['both', 'split']:
+        hemis = ['lh', 'rh']
+    else:
+        hemis = [hemi]
+
+    fig = ipv.figure(width=fig_w, height=fig_h, lighting=True)
+
+    for hemi in hemis:
+        hemi_idx = 0 if hemi == 'lh' else 1
+
+        if hemi_idx == 0:
+            data = stc.data[:len(stc.vertices[0]), 0]
+        else:
+            data = stc.data[len(stc.vertices[0]):, 0]
+
+        vertices = stc.vertices[hemi_idx]
+
+        if len(data) > 0:
+            if isinstance(lim_cmap, str):
+                # 'hot' color map
+                rgb_cmap = cm.get_cmap(lim_cmap)
+                cmap = rgb_cmap(np.arange(rgb_cmap.N))
+                alphas = np.ones(rgb_cmap.N)
+                step = scale_pts[-1] / rgb_cmap.N
+                # coefficients for linear mapping
+                # from [ctrl_pts[0], ctrl_pts[1]) interval into [0, 1]
+                k = 1 / (ctrl_pts[1] - ctrl_pts[0])
+                b = - ctrl_pts[0] * k
+
+                for i in range(0, rgb_cmap.N):
+                    curr_pos = i * step
+
+                    if (curr_pos < ctrl_pts[0]):
+                        alphas[i] = 0
+                    elif (curr_pos < ctrl_pts[1]):
+                        alphas[i] = k * curr_pos + b
+            else:
+                # mne color map
+                rgb_cmap = lim_cmap
+                cmap = rgb_cmap(np.arange(rgb_cmap.N))
+                alphas = np.ones(rgb_cmap.N)
+                step = (scale_pts[-1] - scale_pts[0]) / rgb_cmap.N
+                # coefficients for linear mapping into [0, 1]
+                k_pos = 1 / (ctrl_pts[1] - ctrl_pts[0])
+                k_neg = -k_pos
+                b = - ctrl_pts[0] * k_pos
+
+                for i in range(0, rgb_cmap.N):
+                    curr_pos = i * step + scale_pts[0]
+
+                    if -ctrl_pts[0] < curr_pos < ctrl_pts[0]:
+                        alphas[i] = 0
+                    elif ctrl_pts[0] <= curr_pos < ctrl_pts[1]:
+                        alphas[i] = k_pos * curr_pos + b
+                    elif -ctrl_pts[1] < curr_pos <= -ctrl_pts[0]:
+                        alphas[i] = k_neg * curr_pos + b
+
+            alphas *= alpha
+            np.clip(alphas, 0, 1)
+            cmap[:, -1] = alphas
+            cmap = ListedColormap(cmap)
+
+            dt_min = data.min()
+            dt_max = data.max()
+            # data mapping into [0, 1] interval
+            k = 1 / (dt_max - dt_min)
+            b = 1 - k * dt_max
+
+            data = k * data + b
+            np.clip(data, 0, 1)
+
+            mesh_folder = 'surf/{0}.{1}'.format(hemi, surface)
+            morph_folder = 'surf/{0}.curv'.format(hemi)
+
+            mesh_path = path.join(subjects_dir, subject, mesh_folder)
+            morph_path = path.join(subjects_dir, subject, morph_folder)
+
+            brain_vertices, brain_faces = read_brain_mesh(mesh_path)
+            _, brain_color = read_morph(morph_path)
+
+            if len(vertices) != len(brain_vertices):
+                raise ValueError(
+                    'Should have the same number of vertices,' +
+                    '{0} != {1}'.format(
+                        len(vertices),
+                        len(brain_vertices)
+                    ))
+
+            if (brain_vertices is not None) and (brain_faces is not None):
+                brain_vertices = offset_hemi(brain_vertices, hemi)
+
+                plot_hemisphere_mesh(brain_vertices,
+                                     brain_faces,
+                                     brain_color,
+                                     act_data=data,
+                                     cmap=cmap)
+
+    ipv.style.box_off()
+    ipv.style.axes_off()
+    ipv.style.background_color(background)
+    ipv.view(views_dict[views]['azim'], views_dict[views]['elev'])
+    ipv.squarelim()
+    ipv.show()
+
+    return fig
