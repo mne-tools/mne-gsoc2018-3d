@@ -244,7 +244,8 @@ def plot_source_estimates(stc, subject=None, surface='inflated', hemi='lh',
                           colormap='auto', smoothing_steps=10,
                           transparent=None, alpha=1.0, subjects_dir=None,
                           views='lat', clim='auto', figure=None, size=800,
-                          background='black'):
+                          background='black', initial_time=None,
+                          time_unit='s'):
     u"""Plot SourceEstimates with ipyvolume.
 
     Parameters
@@ -294,6 +295,12 @@ def plot_source_estimates(stc, subject=None, surface='inflated', hemi='lh',
         Has no effect with mpl backend.
     background : matplotlib color
         Color of the background of the display window.
+    initial_time : float | None
+        The time to display on the plot initially. ``None`` to display the
+        first time sample (default).
+    time_unit : 's' | 'ms'
+        Whether time is represented in seconds ("s", default) or
+        milliseconds ("ms").
 
     Returns
     -------
@@ -324,7 +331,13 @@ def plot_source_estimates(stc, subject=None, surface='inflated', hemi='lh',
         raise ValueError('hemi has to be either "lh", "rh", "split", '
                          'or "both"')
 
-    stc.crop(0.09, 0.09)
+    scaler = 1000. if time_unit == 'ms' else 1.
+
+    if initial_time is None:
+        time_idx = 0
+    else:
+        time_idx = np.argmin(np.abs(stc.times - initial_time / scaler))
+
     stc = stc.morph(subject,
                     grade=None,
                     smooth=smoothing_steps,
@@ -352,9 +365,9 @@ def plot_source_estimates(stc, subject=None, surface='inflated', hemi='lh',
         hemi_idx = 0 if hemi == 'lh' else 1
 
         if hemi_idx == 0:
-            data = stc.data[:len(stc.vertices[0]), 0]
+            data = stc.data[:len(stc.vertices[0]), time_idx]
         else:
-            data = stc.data[len(stc.vertices[0]):, 0]
+            data = stc.data[len(stc.vertices[0]):, time_idx]
 
         vertices = stc.vertices[hemi_idx]
 
