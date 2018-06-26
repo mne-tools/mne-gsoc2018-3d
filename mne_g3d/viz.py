@@ -1,6 +1,7 @@
 import os.path as path
 
 import ipyvolume as ipv
+import ipywidgets as widgets
 from matplotlib import cm
 from matplotlib.colors import ListedColormap
 from mne.source_estimate import SourceEstimate
@@ -468,9 +469,24 @@ def plot_source_estimates(stc, subject=None, surface='inflated', hemi='lh',
                 hemi_meshes.append(hemi_mesh)
 
     if time_viewer:
-        ipv.animation_control(hemi_meshes,
-                              sequence_length=len(stc.times),
-                              interval=100)
+        control = ipv.animation_control(hemi_meshes,
+                                        sequence_length=len(stc.times),
+                                        add=False,
+                                        interval=100)
+
+        slider = control.children[1]
+        slider.readout = False
+        label = widgets.Label('{0}{1}'.format(0, time_unit))
+
+        # hadler for changing of selected time moment
+        def handler(change):
+            time_val = stc.times[int(change.new)] * scaler
+            label.value = '{0}{1}'.format(time_val, time_unit)
+
+        slider.observe(handler, names='value')
+        control = widgets.HBox((*control.children, label))
+
+        ipv.gcc().children += (control,)
 
     ipv.style.box_off()
     ipv.style.axes_off()
