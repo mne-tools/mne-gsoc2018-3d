@@ -181,8 +181,7 @@ def plot_brain_mesh(rh_vertices=None,
 def plot_hemisphere_mesh(vertices,
                          faces,
                          color='grey',
-                         act_data=None,
-                         cmap=None):
+                         act_colors=None):
     u"""Plot triangular format Freesurfer surface of the brain hemispheres.
 
     Parameters
@@ -195,8 +194,8 @@ def plot_hemisphere_mesh(vertices,
         Color for each point/vertex/symbol, can be string format, examples for
         red:’red’, ‘#f00’, ‘#ff0000’ or ‘rgb(1,0,0), or rgb array of
         shape (N, 3). Default value is 'grey'.
-    act_data : numpy.array, optional
-        Activation data for the given hemispere.
+    act_colors : numpy.array, optional
+        Activation data for the given hemispere represented as colors.
     cmap : matplotlib.ListedColormap, optional
         Color map with alpha-channel.
 
@@ -216,9 +215,7 @@ def plot_hemisphere_mesh(vertices,
 
     mesh_overlay = None
     # Add mesh overlay and plot data on top of it
-    if (act_data is not None) and (cmap is not None):
-        act_colors = cmap(act_data)
-
+    if act_colors is not None:
         mesh_overlay = ipv.plot_trisurf(x,
                                         y,
                                         z,
@@ -242,10 +239,10 @@ def plot_hemisphere_mesh(vertices,
 
 def plot_source_estimates(stc, subject=None, surface='inflated', hemi='lh',
                           colormap='auto', smoothing_steps=10,
-                          transparent=None, alpha=1.0, subjects_dir=None,
-                          views='lat', clim='auto', figure=None, size=800,
-                          background='black', initial_time=None,
-                          time_unit='s'):
+                          transparent=None, alpha=1.0,  time_viewer=False,
+                          subjects_dir=None, views='lat', clim='auto',
+                          figure=None, size=800, background='black',
+                          initial_time=None, time_unit='s'):
     u"""Plot SourceEstimates with ipyvolume.
 
     Parameters
@@ -273,6 +270,8 @@ def plot_source_estimates(stc, subject=None, surface='inflated', hemi='lh',
     alpha : float
         Alpha value to apply globally to the overlay. Has no effect with mpl
         backend.
+    time_viewer : bool
+        Display ipybolume time slider.
     subjects_dir : str
         The path to the freesurfer subjects reconstructions.
         It corresponds to Freesurfer environment variable SUBJECTS_DIR.
@@ -361,13 +360,23 @@ def plot_source_estimates(stc, subject=None, surface='inflated', hemi='lh',
 
     fig = ipv.figure(width=fig_w, height=fig_h, lighting=True)
 
+    hemi_meshes = []
+
     for hemi in hemis:
         hemi_idx = 0 if hemi == 'lh' else 1
 
-        if hemi_idx == 0:
-            data = stc.data[:len(stc.vertices[0]), time_idx]
+        if time_viewer:
+            if hemi_idx == 0:
+                data_mat = stc.data[:len(stc.vertices[0]), :]
+            else:
+                data_mat = stc.data[len(stc.vertices[0]):, :]
+            # flatten data matrix
+            data = data_mat.ravel()
         else:
-            data = stc.data[len(stc.vertices[0]):, time_idx]
+            if hemi_idx == 0:
+                data = stc.data[:len(stc.vertices[0]), time_idx]
+            else:
+                data = stc.data[len(stc.vertices[0]):, time_idx]
 
         vertices = stc.vertices[hemi_idx]
 
@@ -416,14 +425,20 @@ def plot_source_estimates(stc, subject=None, surface='inflated', hemi='lh',
             cmap[:, -1] = alphas
             cmap = ListedColormap(cmap)
 
-            dt_min = data.min()
-            dt_max = data.max()
+            dt_min = stc.data.min()
+            dt_max = stc.data.max()
             # data mapping into [0, 1] interval
             k = 1 / (dt_max - dt_min)
             b = 1 - k * dt_max
 
             data = k * data + b
             np.clip(data, 0, 1)
+
+            if time_viewer:
+                act_colors = cmap(data).reshape(np.r_[data_mat.shape, 4])
+                act_colors = act_colors.transpose(1, 0, 2)
+            else:
+                act_colors = cmap(data)
 
             mesh_folder = 'surf/{0}.{1}'.format(hemi, surface)
             morph_folder = 'surf/{0}.curv'.format(hemi)
@@ -445,11 +460,17 @@ def plot_source_estimates(stc, subject=None, surface='inflated', hemi='lh',
             if (brain_vertices is not None) and (brain_faces is not None):
                 brain_vertices = offset_hemi(brain_vertices, hemi)
 
-                plot_hemisphere_mesh(brain_vertices,
-                                     brain_faces,
-                                     brain_color,
-                                     act_data=data,
-                                     cmap=cmap)
+                _, hemi_mesh = plot_hemisphere_mesh(brain_vertices,
+                                                    brain_faces,
+                                                    brain_color,
+                                                    act_colors=act_colors)
+
+                hemi_meshes.append(hemi_mesh)
+
+    if time_viewer:
+        ipv.animation_control(hemi_meshes,
+                              sequence_length=len(stc.times),
+                              interval=100)
 
     ipv.style.box_off()
     ipv.style.axes_off()
