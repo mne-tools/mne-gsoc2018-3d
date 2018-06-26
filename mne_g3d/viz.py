@@ -6,7 +6,7 @@ from matplotlib import cm
 from matplotlib.colors import ListedColormap
 from mne.source_estimate import SourceEstimate
 from mne.utils import _check_subject, get_subjects_dir
-from mne.viz._3d import _limits_to_control_points
+from mne.viz._3d import _handle_time, _limits_to_control_points
 import numpy as np
 from pythreejs import (BlendFactors, BlendingMode, Equations, ShaderMaterial,
                        Side)
@@ -239,11 +239,12 @@ def plot_hemisphere_mesh(vertices,
 
 
 def plot_source_estimates(stc, subject=None, surface='inflated', hemi='lh',
-                          colormap='auto', smoothing_steps=10,
-                          transparent=None, alpha=1.0,  time_viewer=False,
-                          subjects_dir=None, views='lat', clim='auto',
-                          figure=None, size=800, background='black',
-                          initial_time=None, time_unit='s'):
+                          colormap='auto', time_label='auto',
+                          smoothing_steps=10, transparent=None, alpha=1.0,
+                          time_viewer=False, subjects_dir=None, views='lat',
+                          clim='auto', figure=None, size=800,
+                          background='black', initial_time=None,
+                          time_unit='s'):
     u"""Plot SourceEstimates with ipyvolume.
 
     Parameters
@@ -262,6 +263,10 @@ def plot_source_estimates(stc, subject=None, surface='inflated', hemi='lh',
         Name of colormap to use or a custom look up table. If array, must
         be (n x 3) or (n x 4) array for with RGB or RGBA values between
         0 and 255. Default is 'hot'.
+    time_label : str | callable | None
+        Format of the time label (a format string, a function that maps
+        floating point time values to strings, or None for no label). The
+        default is ``time=%0.2f ms``.
     smoothing_steps : int
         The amount of smoothing
     transparent : bool | None
@@ -337,6 +342,8 @@ def plot_source_estimates(stc, subject=None, surface='inflated', hemi='lh',
         time_idx = 0
     else:
         time_idx = np.argmin(np.abs(stc.times - initial_time / scaler))
+
+    time_label, times = _handle_time(time_label, time_unit, stc.times)
 
     stc = stc.morph(subject,
                     grade=None,
@@ -476,12 +483,12 @@ def plot_source_estimates(stc, subject=None, surface='inflated', hemi='lh',
 
         slider = control.children[1]
         slider.readout = False
-        label = widgets.Label('{0}{1}'.format(0, time_unit))
+        slider.value = time_idx
+        label = widgets.Label(time_label % times[time_idx])
 
         # hadler for changing of selected time moment
         def handler(change):
-            time_val = stc.times[int(change.new)] * scaler
-            label.value = '{0}{1}'.format(time_val, time_unit)
+            label.value = time_label % times[int(change.new)]
 
         slider.observe(handler, names='value')
         control = widgets.HBox((*control.children, label))
