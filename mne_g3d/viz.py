@@ -143,6 +143,8 @@ def plot_brain_mesh(rh_vertices=None,
 
         lh_act_data = act_data[:len(lh_vertices)]
         rh_act_data = act_data[len(lh_vertices):]
+        lh_act_colors = cmap(lh_act_data)
+        rh_act_colors = cmap(rh_act_data)
     else:
         rh_act_data = None
         lh_act_data = None
@@ -155,8 +157,7 @@ def plot_brain_mesh(rh_vertices=None,
         rh_mesh, _ = plot_hemisphere_mesh(rh_vertices,
                                           rh_faces,
                                           rh_color,
-                                          act_data=rh_act_data,
-                                          cmap=cmap)
+                                          act_colors=rh_act_colors)
 
     if (lh_vertices is not None) and (lh_faces is not None):
         if offset is not None:
@@ -165,8 +166,7 @@ def plot_brain_mesh(rh_vertices=None,
         lh_mesh, _ = plot_hemisphere_mesh(lh_vertices,
                                           lh_faces,
                                           lh_color,
-                                          act_data=lh_act_data,
-                                          cmap=cmap)
+                                          act_colors=lh_act_colors)
 
     ipv.style.box_off()
     ipv.style.axes_off()
@@ -242,9 +242,9 @@ def plot_source_estimates(stc, subject=None, surface='inflated', hemi='lh',
                           colormap='auto', time_label='auto',
                           smoothing_steps=10, transparent=None, alpha=1.0,
                           time_viewer=False, subjects_dir=None, views='lat',
-                          clim='auto', figure=None, size=800,
-                          background='black', initial_time=None,
-                          time_unit='s'):
+                          colorbar=False, clim='auto', cortex='classic',
+                          size=800, background='black', foreground=None,
+                          initial_time=None, time_unit='s'):
     u"""Plot SourceEstimates with ipyvolume.
 
     Parameters
@@ -284,6 +284,8 @@ def plot_source_estimates(stc, subject=None, surface='inflated', hemi='lh',
     views : str | list
         View to use. It must be one of ["lat", "med", "fos", "cau", "dor",
         "ven", "fro", "par"].
+    colorbar : bool
+        If True, display colorbar on scene.
     clim : str | dict
         Colorbar properties specification. If 'auto', set clim automatically
         based on data percentiles. If dict, should contain:
@@ -294,12 +296,36 @@ def plot_source_estimates(stc, subject=None, surface='inflated', hemi='lh',
                 Left, middle, and right bound for colormap.
         Unlike :meth:`stc.plot <mne.SourceEstimate.plot>`, it cannot use
         ``pos_lims``, as the surface plot must show the magnitude.
+    cortex : str, tuple, dict, or None
+        Specifies how the cortical surface is rendered. Options:
+            1. The name of one of the preset cortex styles:
+               ``'classic'`` (default), ``'high_contrast'``,
+               ``'low_contrast'``, or ``'bone'``.
+            2. A color-like argument to render the cortex as a single
+               color, e.g. ``'red'`` or ``(0.1, 0.4, 1.)``. Setting
+               this to ``None`` is equivalent to ``(0.5, 0.5, 0.5)``.
+            3. The name of a colormap used to render binarized
+               curvature values, e.g., ``Grays``.
+            4. A list of colors used to render binarized curvature
+               values. Only the first and last colors are used. E.g.,
+               ['red', 'blue'] or [(1, 0, 0), (0, 0, 1)].
+            5. A container with four entries for colormap (string
+               specifying the name of a colormap), vmin (float
+               specifying the minimum value for the colormap), vmax
+               (float specifying the maximum value for the colormap),
+               and reverse (bool specifying whether the colormap
+               should be reversed. E.g., ``('Greys', -1, 2, False)``.
+            6. A dict of keyword arguments that is passed on to the
+               call to surface.
     size : float or pair of floats
         The size of the window, in pixels. can be one number to specify
         a square window, or the (width, height) of a rectangular window.
         Has no effect with mpl backend.
     background : matplotlib color
         Color of the background of the display window.
+    foreground : matplotlib color
+        Color of the foreground of the display window. Has no effect with mpl
+        backend.
     initial_time : float | None
         The time to display on the plot initially. ``None`` to display the
         first time sample (default).
@@ -331,6 +357,23 @@ def plot_source_estimates(stc, subject=None, surface='inflated', hemi='lh',
     subjects_dir = get_subjects_dir(subjects_dir=subjects_dir,
                                     raise_error=True)
     subject = _check_subject(stc.subject, subject, True)
+
+    if colorbar:
+        raise NotImplementedError('colobar=True is not yet supported.')
+
+    if not isinstance(colormap, str):
+        raise NotImplementedError('Support for "colomap" of a type other' +
+                                  ' than str is not yet implemented.')
+
+    if cortex != 'classic':
+        raise NotImplementedError('Options for parameter "cortex" ' +
+                                  'is not yet supported.')
+
+    if foreground is not None:
+        raise NotImplementedError('"foreground" is not yet supported.')
+
+    if hemi == 'split':
+        raise NotImplementedError('hemi="split" is not yet implemented.')
 
     if hemi not in ['lh', 'rh', 'split', 'both']:
         raise ValueError('hemi has to be either "lh", "rh", "split", '
@@ -484,11 +527,17 @@ def plot_source_estimates(stc, subject=None, surface='inflated', hemi='lh',
         slider = control.children[1]
         slider.readout = False
         slider.value = time_idx
-        label = widgets.Label(time_label % times[time_idx])
+        if isinstance(time_label, str):
+            label = widgets.Label(time_label % times[time_idx])
+        elif callable(time_label):
+            label = widgets.Label(time_label(times[time_idx]))
 
         # hadler for changing of selected time moment
         def handler(change):
-            label.value = time_label % times[int(change.new)]
+            if isinstance(time_label, str):
+                label.value = time_label % times[int(change.new)]
+            elif callable(time_label):
+                label.value = time_label(times[int(change.new)])
 
         slider.observe(handler, names='value')
         control = widgets.HBox((*control.children, label))
