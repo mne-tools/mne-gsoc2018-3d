@@ -1,12 +1,10 @@
-from base64 import b64encode
-from io import BytesIO
 import os.path as path
 
+from bqplot import Axis, ColorScale, Figure, HeatMap, LinearScale
 import ipyvolume as ipv
 import ipywidgets as widgets
 from matplotlib import cm
 from matplotlib.colors import ListedColormap
-import matplotlib.pyplot as plt
 from mne.source_estimate import SourceEstimate
 from mne.utils import _check_subject, get_subjects_dir
 from mne.viz._3d import _handle_time, _limits_to_control_points
@@ -361,9 +359,6 @@ def plot_source_estimates(stc, subject=None, surface='inflated', hemi='lh',
                                     raise_error=True)
     subject = _check_subject(stc.subject, subject, True)
 
-    if colorbar:
-        raise NotImplementedError('colobar=True is not yet supported.')
-
     if not isinstance(colormap, str):
         raise NotImplementedError('Support for "colomap" of a type other' +
                                   ' than str is not yet implemented.')
@@ -546,23 +541,36 @@ def plot_source_estimates(stc, subject=None, surface='inflated', hemi='lh',
         control = widgets.HBox((*control.children, label))
 
         # create a colorbar
-        a = np.array([[0,1]])
-        fig = plt.figure(figsize=(9, 1.5))
-        img = plt.imshow(a, cmap=cmap)
-        plt.gca().set_visible(False)
-        cax = plt.axes([0.1, 0.2, 0.8, 0.6])
-        plt.colorbar(img, orientation="horizontal", cax=cax)
+        if colorbar:
+            cbar_data = np.linspace(0, 1, cmap.N)
+            cbar_ticks = np.linspace(dt_min, dt_max, cmap.N)
+            color = np.array((cbar_data, cbar_data))
 
-        figdata = BytesIO()
-        fig.savefig(figdata, format='png')
-        png_img = figdata.getvalue()
+            colors = cmap(cbar_data)
+            # transform to [0, 255] range taking into account transparency
+            colors = colors = np.array([255 * c[:-1] * c[-1] if c[-1] >= 0.7
+                                        else 128 * np.ones(3) for c in colors])
+            colors = colors.astype(int)
+            colors = ['#%02x%02x%02x' % tuple(c) for c in colors]
 
-        img_widget = widgets.Image(value=png_img,
-                                   format='png',
-                                   width=fig_w)
-        info_widget = widgets.VBox((control, img_widget))
+            x_sc, col_sc = LinearScale(), ColorScale(colors=colors)
+            ax_x = Axis(scale=x_sc)
 
-        ipv.gcc().children += ((info_widget,))
+            heat = HeatMap(x=cbar_ticks,
+                           color=color,
+                           scales={'x': x_sc, 'color': col_sc})
+
+            cbar_fig_margin = {'top': 15, 'bottom': 15, 'left': 5, 'right': 5}
+            cbar_fig = Figure(axes=[ax_x],
+                              marks=[heat],
+                              fig_margin=cbar_fig_margin,
+                              layout=widgets.Layout(width='%dpx' % fig_w,
+                                                    height='60px'))
+
+            info_widget = widgets.VBox((control, cbar_fig))
+            ipv.gcc().children += (info_widget,)
+        else:
+            ipv.gcc().children += (control,)
 
     ipv.style.box_off()
     ipv.style.axes_off()
