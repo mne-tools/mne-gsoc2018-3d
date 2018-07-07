@@ -1,9 +1,12 @@
+from base64 import b64encode
+from io import BytesIO
 import os.path as path
 
 import ipyvolume as ipv
 import ipywidgets as widgets
 from matplotlib import cm
 from matplotlib.colors import ListedColormap
+import matplotlib.pyplot as plt
 from mne.source_estimate import SourceEstimate
 from mne.utils import _check_subject, get_subjects_dir
 from mne.viz._3d import _handle_time, _limits_to_control_points
@@ -542,7 +545,24 @@ def plot_source_estimates(stc, subject=None, surface='inflated', hemi='lh',
         slider.observe(handler, names='value')
         control = widgets.HBox((*control.children, label))
 
-        ipv.gcc().children += (control,)
+        # create a colorbar
+        a = np.array([[0,1]])
+        fig = plt.figure(figsize=(9, 1.5))
+        img = plt.imshow(a, cmap=cmap)
+        plt.gca().set_visible(False)
+        cax = plt.axes([0.1, 0.2, 0.8, 0.6])
+        plt.colorbar(img, orientation="horizontal", cax=cax)
+
+        figdata = BytesIO()
+        fig.savefig(figdata, format='png')
+        png_img = figdata.getvalue()
+
+        img_widget = widgets.Image(value=png_img,
+                                   format='png',
+                                   width=fig_w)
+        info_widget = widgets.VBox((control, img_widget))
+
+        ipv.gcc().children += ((info_widget,))
 
     ipv.style.box_off()
     ipv.style.axes_off()
