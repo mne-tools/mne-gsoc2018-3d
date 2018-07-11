@@ -5,7 +5,7 @@ import ipyvolume as ipv
 import ipywidgets as widgets
 from matplotlib import cm
 from matplotlib.colors import ListedColormap
-from mne.source_estimate import SourceEstimate
+from mne.source_estimate import compute_morph_matrix, SourceEstimate
 from mne.utils import _check_subject, get_subjects_dir
 from mne.viz._3d import _handle_time, _limits_to_control_points
 import numpy as np
@@ -386,11 +386,29 @@ def plot_source_estimates(stc, subject=None, surface='inflated', hemi='lh',
 
     time_label, times = _handle_time(time_label, time_unit, stc.times)
 
-    stc = stc.morph(subject,
-                    grade=None,
-                    smooth=smoothing_steps,
-                    subjects_dir=subjects_dir,
-                    subject_from=subject)
+    hemi_vertices = {}
+    hemi_faces = {}
+
+    for h in ('lh', 'rh'):
+        mesh_folder = 'surf/{0}.{1}'.format(h, surface)
+
+        mesh_path = path.join(subjects_dir, subject, mesh_folder)
+
+        brain_vertices, brain_faces = read_brain_mesh(mesh_path)
+
+        hemi_vertices[h] = brain_vertices
+        hemi_faces[h] = brain_faces
+
+    morph_vert_to = [np.arange(len(hemi_vertices['lh'])),
+                     np.arange(len(hemi_vertices['rh']))]
+
+    morph_mat = compute_morph_matrix(subject_from=subject,
+                                     subject_to=subject,
+                                     vertices_from=stc.vertices,
+                                     vertices_to=morph_vert_to,
+                                     smooth=smoothing_steps,
+                                     subjects_dir=subjects_dir)
+    stc_data = morph_mat.dot(stc.data[:, time_idx])
 
     if isinstance(size, int):
         fig_w = size
@@ -400,34 +418,22 @@ def plot_source_estimates(stc, subject=None, surface='inflated', hemi='lh',
 
     # convert control points to locations in colormap
     ctrl_pts, lim_cmap, scale_pts, transparent = _limits_to_control_points(
-        clim, stc.data[:, 0], colormap, transparent, fmt='matplotlib')
+        clim, stc.data, colormap, transparent, fmt='matplotlib')
 
-    if hemi in ['both', 'split']:
-        hemis = ['lh', 'rh']
+    if hemi in ('both', 'split'):
+        hemis = ('lh', 'rh')
     else:
-        hemis = [hemi]
+        hemis = (hemi, )
 
     fig = ipv.figure(width=fig_w, height=fig_h, lighting=True)
 
-    hemi_meshes = []
+    hemi_meshes = {}
 
     for hemi in hemis:
-        hemi_idx = 0 if hemi == 'lh' else 1
-
-        if time_viewer:
-            if hemi_idx == 0:
-                data_mat = stc.data[:len(stc.vertices[0]), :]
-            else:
-                data_mat = stc.data[len(stc.vertices[0]):, :]
-            # flatten data matrix
-            data = data_mat.ravel()
+        if hemi == 'lh':
+            data = stc_data[:len(hemi_vertices['lh'])]
         else:
-            if hemi_idx == 0:
-                data = stc.data[:len(stc.vertices[0]), time_idx]
-            else:
-                data = stc.data[len(stc.vertices[0]):, time_idx]
-
-        vertices = stc.vertices[hemi_idx]
+            data = stc_data[len(hemi_vertices['lh']):]
 
         if len(data) > 0:
             if isinstance(lim_cmap, str):
@@ -483,28 +489,15 @@ def plot_source_estimates(stc, subject=None, surface='inflated', hemi='lh',
             data = k * data + b
             np.clip(data, 0, 1)
 
-            if time_viewer:
-                act_colors = cmap(data).reshape(np.r_[data_mat.shape, 4])
-                act_colors = act_colors.transpose(1, 0, 2)
-            else:
-                act_colors = cmap(data)
+            act_colors = cmap(data)
 
-            mesh_folder = 'surf/{0}.{1}'.format(hemi, surface)
             morph_folder = 'surf/{0}.curv'.format(hemi)
 
-            mesh_path = path.join(subjects_dir, subject, mesh_folder)
             morph_path = path.join(subjects_dir, subject, morph_folder)
 
-            brain_vertices, brain_faces = read_brain_mesh(mesh_path)
+            brain_vertices = hemi_vertices[hemi]
+            brain_faces = hemi_faces[hemi]
             _, brain_color = read_morph(morph_path)
-
-            if len(vertices) != len(brain_vertices):
-                raise ValueError(
-                    'Should have the same number of vertices,' +
-                    '{0} != {1}'.format(
-                        len(vertices),
-                        len(brain_vertices)
-                    ))
 
             if (brain_vertices is not None) and (brain_faces is not None):
                 brain_vertices = offset_hemi(brain_vertices, hemi)
@@ -514,13 +507,13 @@ def plot_source_estimates(stc, subject=None, surface='inflated', hemi='lh',
                                                     brain_color,
                                                     act_colors=act_colors)
 
-                hemi_meshes.append(hemi_mesh)
+                hemi_meshes[hemi] = hemi_mesh
 
     if time_viewer:
-        control = ipv.animation_control(hemi_meshes,
+        control = ipv.animation_control(tuple(hemi_meshes.values()),
                                         sequence_length=len(stc.times),
                                         add=False,
-                                        interval=100)
+                                        interval=500)
 
         slider = control.children[1]
         slider.readout = False
@@ -531,13 +524,29 @@ def plot_source_estimates(stc, subject=None, surface='inflated', hemi='lh',
             label = widgets.Label(time_label(times[time_idx]))
 
         # hadler for changing of selected time moment
-        def handler(change):
-            if isinstance(time_label, str):
-                label.value = time_label % times[int(change.new)]
-            elif callable(time_label):
-                label.value = time_label(times[int(change.new)])
+        def slider_handler(change):
+            # change plot
+            time_idx_new = int(change.new)
+            stc_data = morph_mat.dot(stc.data[:, time_idx_new])
 
-        slider.observe(handler, names='value')
+            for hemi in hemis:
+                if hemi == 'lh':
+                    data = stc_data[:len(hemi_vertices['lh'])]
+                else:
+                    data = stc_data[len(hemi_vertices['lh']):]
+
+                data = k * data + b
+                np.clip(data, 0, 1)
+                act_color_new = cmap(data)
+                hemi_meshes[hemi].color = act_color_new
+
+            # change label value
+            if isinstance(time_label, str):
+                label.value = time_label % times[time_idx_new]
+            elif callable(time_label):
+                label.value = time_label(times[time_idx_new])
+
+        slider.observe(slider_handler, names='value')
         control = widgets.HBox((*control.children, label))
 
         # create a colorbar
