@@ -12,7 +12,7 @@ import numpy as np
 from pythreejs import (BlendFactors, BlendingMode, Equations, ShaderMaterial,
                        Side)
 
-from ._utils import offset_hemi
+from ._utils import offset_hemi, _calculate_cmap
 from .io import read_brain_mesh, read_morph
 
 
@@ -418,7 +418,15 @@ def plot_source_estimates(stc, subject=None, surface='inflated', hemi='lh',
 
     # convert control points to locations in colormap
     ctrl_pts, lim_cmap, scale_pts, transparent = _limits_to_control_points(
-        clim, stc.data, colormap, transparent, fmt='matplotlib')
+        clim, stc.data.ravel(), colormap, transparent, fmt='matplotlib')
+
+    cmap = _calculate_cmap(lim_cmap, alpha, ctrl_pts, scale_pts)
+
+    # data mapping into [0, 1] interval
+    dt_max = scale_pts[-1]
+    dt_min = 0
+    k = 1 / (dt_max - dt_min)
+    b = 1 - k * dt_max
 
     if hemi in ('both', 'split'):
         hemis = ('lh', 'rh')
@@ -436,56 +444,6 @@ def plot_source_estimates(stc, subject=None, surface='inflated', hemi='lh',
             data = stc_data[len(hemi_vertices['lh']):]
 
         if len(data) > 0:
-            if isinstance(lim_cmap, str):
-                # 'hot' color map
-                rgb_cmap = cm.get_cmap(lim_cmap)
-                cmap = rgb_cmap(np.arange(rgb_cmap.N))
-                alphas = np.ones(rgb_cmap.N)
-                step = scale_pts[-1] / rgb_cmap.N
-                # coefficients for linear mapping
-                # from [ctrl_pts[0], ctrl_pts[1]) interval into [0, 1]
-                k = 1 / (ctrl_pts[1] - ctrl_pts[0])
-                b = - ctrl_pts[0] * k
-
-                for i in range(0, rgb_cmap.N):
-                    curr_pos = i * step
-
-                    if (curr_pos < ctrl_pts[0]):
-                        alphas[i] = 0
-                    elif (curr_pos < ctrl_pts[1]):
-                        alphas[i] = k * curr_pos + b
-            else:
-                # mne color map
-                rgb_cmap = lim_cmap
-                cmap = rgb_cmap(np.arange(rgb_cmap.N))
-                alphas = np.ones(rgb_cmap.N)
-                step = (scale_pts[-1] - scale_pts[0]) / rgb_cmap.N
-                # coefficients for linear mapping into [0, 1]
-                k_pos = 1 / (ctrl_pts[1] - ctrl_pts[0])
-                k_neg = -k_pos
-                b = - ctrl_pts[0] * k_pos
-
-                for i in range(0, rgb_cmap.N):
-                    curr_pos = i * step + scale_pts[0]
-
-                    if -ctrl_pts[0] < curr_pos < ctrl_pts[0]:
-                        alphas[i] = 0
-                    elif ctrl_pts[0] <= curr_pos < ctrl_pts[1]:
-                        alphas[i] = k_pos * curr_pos + b
-                    elif -ctrl_pts[1] < curr_pos <= -ctrl_pts[0]:
-                        alphas[i] = k_neg * curr_pos + b
-
-            alphas *= alpha
-            np.clip(alphas, 0, 1)
-            cmap[:, -1] = alphas
-            cmap = ListedColormap(cmap)
-
-            dt_min = stc.data.min()
-            dt_max = stc.data.max()
-            # data mapping into [0, 1] interval
-            k = 1 / (dt_max - dt_min)
-            b = 1 - k * dt_max
-
             data = k * data + b
             np.clip(data, 0, 1)
 
@@ -526,6 +484,9 @@ def plot_source_estimates(stc, subject=None, surface='inflated', hemi='lh',
         # hadler for changing of selected time moment
         def slider_handler(change):
             # change plot
+            nonlocal cmap
+            nonlocal k
+            nonlocal b
             time_idx_new = int(change.new)
             stc_data = morph_mat.dot(stc.data[:, time_idx_new])
 
@@ -557,8 +518,8 @@ def plot_source_estimates(stc, subject=None, surface='inflated', hemi='lh',
 
             colors = cmap(cbar_data)
             # transform to [0, 255] range taking into account transparency
-            colors = colors = np.array([255 * c[:-1] * c[-1] if c[-1] >= 0.7
-                                        else 128 * np.ones(3) for c in colors])
+            colors = colors = np.array([255 * c[:-1] * c[-1] for c in colors])
+
             colors = colors.astype(int)
             colors = ['#%02x%02x%02x' % tuple(c) for c in colors]
 
@@ -576,7 +537,105 @@ def plot_source_estimates(stc, subject=None, surface='inflated', hemi='lh',
                               layout=widgets.Layout(width='%dpx' % fig_w,
                                                     height='60px'))
 
-            info_widget = widgets.VBox((control, cbar_fig))
+            slider_fmin = widgets.FloatSlider(value=ctrl_pts[0],
+                                              min=dt_min,
+                                              max=dt_max,
+                                              step=0.1,
+                                              description='fmin',
+                                              disabled=False,
+                                              continuous_update=False,
+                                              orientation='horizontal',
+                                              readout=True,
+                                              readout_format='.1f')
+
+            slider_fmid = widgets.FloatSlider(value=ctrl_pts[1],
+                                              min=dt_min,
+                                              max=dt_max,
+                                              step=0.1,
+                                              description='fmid',
+                                              disabled=False,
+                                              continuous_update=False,
+                                              orientation='horizontal',
+                                              readout=True,
+                                              readout_format='.1f')
+
+            slider_fmax = widgets.FloatSlider(value=ctrl_pts[-1],
+                                              min=dt_min,
+                                              max=dt_max,
+                                              step=0.1,
+                                              description='fmax',
+                                              disabled=False,
+                                              continuous_update=False,
+                                              orientation='horizontal',
+                                              readout=True,
+                                              readout_format='.1f')
+
+            button_upd_mesh = widgets.Button(description='Update mesh',
+                                             disabled=False,
+                                             button_style='',
+                                             tooltip='Update mesh')
+
+            def on_update(but_event):
+                ctrl_pts = (slider_fmin.value,
+                            slider_fmid.value,
+                            slider_fmax.value)
+                dt_max = slider_fmax.value
+
+                if not ctrl_pts[0] < ctrl_pts[1] < ctrl_pts[3]:
+                    raise ValueError('Incorrect relationship between' +
+                                     ' fmin, fmid, fmax. Given values ' +
+                                     '{0}, {1}, {2}'.format(*ctrl_pts))
+
+                # how scale points are different from control points?
+                nonlocal cmap
+                nonlocal k
+                nonlocal b
+
+                if isinstance(lim_cmap, str):
+                    # 'hot' color map
+                    scale_pts = ctrl_pts
+                else:
+                    # 'mne' color map
+                    scale_pts = (-ctrl_pts[-1], 0, ctrl_pts[-1])
+
+                cmap = _calculate_cmap(lim_cmap, alpha, ctrl_pts, scale_pts)
+                k = 1 / (dt_max - dt_min)
+                b = 1 - k * dt_max
+
+                for hemi in hemis:
+                    if hemi == 'lh':
+                        data = stc_data[:len(hemi_vertices['lh'])]
+                    else:
+                        data = stc_data[len(hemi_vertices['lh']):]
+
+                    data = k * data + b
+                    np.clip(data, 0, 1)
+                    act_color_new = cmap(data)
+                    hemi_meshes[hemi].color = act_color_new
+
+                colors = cmap(cbar_data)
+                # transform to [0, 255] range taking into account transparency
+                colors = colors = np.array([255 * c[:-1] * c[-1]
+                                            for c in colors])
+
+                colors = colors.astype(int)
+                colors = ['#%02x%02x%02x' % tuple(c) for c in colors]
+                col_sc = ColorScale(colors=colors)
+
+                heat = HeatMap(x=cbar_ticks,
+                               color=color,
+                               scales={'x': x_sc, 'color': col_sc})
+                cbar_fig.marks = [heat]
+
+            button_upd_mesh.on_click(on_update)
+
+            info_widget = widgets.VBox((control,
+                                        cbar_fig,
+                                        slider_fmin,
+                                        slider_fmid,
+                                        slider_fmax,
+                                        button_upd_mesh))
+
             ipv.gcc().children += (info_widget,)
         else:
             ipv.gcc().children += (control,)
