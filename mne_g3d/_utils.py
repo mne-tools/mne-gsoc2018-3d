@@ -67,16 +67,19 @@ def _calculate_cmap(lim_cmap, alpha, ctrl_pts, scale_pts):
     if isinstance(lim_cmap, str):
         # 'hot' color map
         rgb_cmap = cm.get_cmap(lim_cmap)
-        cmap = rgb_cmap(np.arange(rgb_cmap.N))
-        alphas = np.ones(rgb_cmap.N)
-        step = scale_pts[-1] / rgb_cmap.N
+        # take 60% of hot color map, so it will be consistent
+        # with mayavi plots
+        cmap_size = int(rgb_cmap.N * 0.6)
+        cmap = rgb_cmap(np.arange(rgb_cmap.N))[rgb_cmap.N - cmap_size:, :]
+        alphas = np.ones(cmap_size)
+        step = 2 * (scale_pts[-1] - scale_pts[0]) / rgb_cmap.N
         # coefficients for linear mapping
         # from [ctrl_pts[0], ctrl_pts[1]) interval into [0, 1]
         k = 1 / (ctrl_pts[1] - ctrl_pts[0])
         b = - ctrl_pts[0] * k
 
-        for i in range(0, rgb_cmap.N):
-            curr_pos = i * step
+        for i in range(0, cmap_size):
+            curr_pos = i * step + scale_pts[0]
 
             if (curr_pos < ctrl_pts[0]):
                 alphas[i] = 0

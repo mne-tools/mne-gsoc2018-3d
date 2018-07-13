@@ -424,7 +424,7 @@ def plot_source_estimates(stc, subject=None, surface='inflated', hemi='lh',
 
     # data mapping into [0, 1] interval
     dt_max = scale_pts[-1]
-    dt_min = 0
+    dt_min = scale_pts[0]
     k = 1 / (dt_max - dt_min)
     b = 1 - k * dt_max
 
@@ -536,39 +536,24 @@ def plot_source_estimates(stc, subject=None, surface='inflated', hemi='lh',
                               fig_margin=cbar_fig_margin,
                               layout=widgets.Layout(width='%dpx' % fig_w,
                                                     height='60px'))
-
-            slider_fmin = widgets.FloatSlider(value=ctrl_pts[0],
-                                              min=dt_min,
-                                              max=dt_max,
-                                              step=0.1,
-                                              description='fmin',
-                                              disabled=False,
-                                              continuous_update=False,
-                                              orientation='horizontal',
-                                              readout=True,
-                                              readout_format='.1f')
-
-            slider_fmid = widgets.FloatSlider(value=ctrl_pts[1],
-                                              min=dt_min,
-                                              max=dt_max,
-                                              step=0.1,
-                                              description='fmid',
-                                              disabled=False,
-                                              continuous_update=False,
-                                              orientation='horizontal',
-                                              readout=True,
-                                              readout_format='.1f')
-
-            slider_fmax = widgets.FloatSlider(value=ctrl_pts[-1],
-                                              min=dt_min,
-                                              max=dt_max,
-                                              step=0.1,
-                                              description='fmax',
-                                              disabled=False,
-                                              continuous_update=False,
-                                              orientation='horizontal',
-                                              readout=True,
-                                              readout_format='.1f')
+            input_fmin = widgets.BoundedFloatText(value=round(ctrl_pts[0], 2),
+                                                  min=dt_min,
+                                                  max=dt_max,
+                                                  description='Fmin:',
+                                                  step=0.1,
+                                                  disabled=False)
+            input_fmid = widgets.BoundedFloatText(value=round(ctrl_pts[1], 2),
+                                                  min=dt_min,
+                                                  max=dt_max,
+                                                  description='Fmid:',
+                                                  step=0.1,
+                                                  disabled=False)
+            input_fmax = widgets.BoundedFloatText(value=round(ctrl_pts[2], 2),
+                                                  min=dt_min,
+                                                  max=dt_max,
+                                                  description='Fmax:',
+                                                  step=0.1,
+                                                  disabled=False)
 
             button_upd_mesh = widgets.Button(description='Update mesh',
                                              disabled=False,
@@ -576,17 +561,16 @@ def plot_source_estimates(stc, subject=None, surface='inflated', hemi='lh',
                                              tooltip='Update mesh')
 
             def on_update(but_event):
-                ctrl_pts = (slider_fmin.value,
-                            slider_fmid.value,
-                            slider_fmax.value)
-                dt_max = slider_fmax.value
+                ctrl_pts = (input_fmin.value,
+                            input_fmid.value,
+                            input_fmax.value)
+                dt_min = input_fmin.value
+                dt_max = input_fmax.value
 
-                if not ctrl_pts[0] < ctrl_pts[1] < ctrl_pts[3]:
+                if not ctrl_pts[0] < ctrl_pts[1] < ctrl_pts[2]:
                     raise ValueError('Incorrect relationship between' +
                                      ' fmin, fmid, fmax. Given values ' +
                                      '{0}, {1}, {2}'.format(*ctrl_pts))
-
-                # how scale points are different from control points?
                 nonlocal cmap
                 nonlocal k
                 nonlocal b
@@ -631,9 +615,9 @@ def plot_source_estimates(stc, subject=None, surface='inflated', hemi='lh',
 
             info_widget = widgets.VBox((control,
                                         cbar_fig,
-                                        slider_fmin,
-                                        slider_fmid,
-                                        slider_fmax,
+                                        input_fmin,
+                                        input_fmid,
+                                        input_fmax,
                                         button_upd_mesh))
 
             ipv.gcc().children += (info_widget,)
