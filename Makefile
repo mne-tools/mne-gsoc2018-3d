@@ -6,7 +6,7 @@ PYTHON ?= python
 PYTESTS ?= py.test
 CTAGS ?= ctags
 CODESPELL_SKIPS ?= "*.fif"
-CODESPELL_DIRS ?= mne_g3d/
+CODESPELL_DIRS ?= ipysurfer/
 all: clean inplace test test-doc
 
 clean-pyc:
@@ -32,12 +32,12 @@ inplace:
 	$(PYTHON) setup.py build_ext -i
 
 test:
-	pytest mne_g3d
+	pytest ipysurfer
 
 pep: flake pydocstyle codespell-error
 
 flake:
-	flake8 --count mne_g3d
+	flake8 --count ipysurfer
 
 pydocstyle:
 	pydocstyle

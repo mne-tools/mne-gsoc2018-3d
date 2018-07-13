@@ -8,4 +8,4 @@ install:
   - pip install codespell flake8 ipyvolume matplotlib mne numpy nibabel pydocstyle pythreejs scipy
 script:
   - make pep
-  - python -c "import mne_g3d"  # just a smoke test for now
+  - python -c "import ipysurfer"  # just a smoke test for now
