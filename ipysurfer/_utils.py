@@ -1,7 +1,7 @@
 import numpy as np
 
 
-def offset_hemi(vertices, hemi, offset=0.0):
+def _offset_hemi(vertices, hemi, offset=0.0):
     u"""Offset hemispere.
 
     Parameters

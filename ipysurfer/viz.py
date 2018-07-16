@@ -6,7 +6,7 @@ import numpy as np
 from pythreejs import (BlendFactors, BlendingMode, Equations, ShaderMaterial,
                        Side)
 
-from ._utils import offset_hemi
+from ._utils import _offset_hemi
 
 
 def plot_brain_mesh(rh_vertices=None,
@@ -144,7 +144,7 @@ def plot_brain_mesh(rh_vertices=None,
 
     if (rh_vertices is not None) and (rh_faces is not None):
         if offset is not None:
-            rh_vertices = offset_hemi(rh_vertices, 'rh', offset)
+            rh_vertices = _offset_hemi(rh_vertices, 'rh', offset)
 
         rh_mesh, _ = plot_hemisphere_mesh(rh_vertices,
                                           rh_faces,
@@ -154,7 +154,7 @@ def plot_brain_mesh(rh_vertices=None,
 
     if (lh_vertices is not None) and (lh_faces is not None):
         if offset is not None:
-            lh_vertices = offset_hemi(lh_vertices, 'lh', offset)
+            lh_vertices = _offset_hemi(lh_vertices, 'lh', offset)
 
         lh_mesh, _ = plot_hemisphere_mesh(lh_vertices,
                                           lh_faces,
