@@ -518,7 +518,10 @@ def plot_source_estimates(stc, subject=None, surface='inflated', hemi='lh',
 
             colors = cmap(cbar_data)
             # transform to [0, 255] range taking into account transparency
-            colors = colors = np.array([255 * c[:-1] * c[-1] for c in colors])
+            bg_color = 0.5 * np.ones(3)
+            colors = np.array([255 * c[:-1] if c[-1] == 1 else
+                               255 * (c[:-1] * c[-1] + bg_color *
+                               (1 - c[-1])) for c in colors])
 
             colors = colors.astype(int)
             colors = ['#%02x%02x%02x' % tuple(c) for c in colors]
@@ -599,8 +602,9 @@ def plot_source_estimates(stc, subject=None, surface='inflated', hemi='lh',
 
                 colors = cmap(cbar_data)
                 # transform to [0, 255] range taking into account transparency
-                colors = colors = np.array([255 * c[:-1] * c[-1]
-                                            for c in colors])
+                colors = np.array([255 * c[:-1] if c[-1] == 1 else
+                                   255 * (c[:-1] * c[-1] + bg_color *
+                                   (1 - c[-1])) for c in colors])
 
                 colors = colors.astype(int)
                 colors = ['#%02x%02x%02x' % tuple(c) for c in colors]
