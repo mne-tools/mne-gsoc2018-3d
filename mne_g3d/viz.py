@@ -518,10 +518,11 @@ def plot_source_estimates(stc, subject=None, surface='inflated', hemi='lh',
 
             colors = cmap(cbar_data)
             # transform to [0, 255] range taking into account transparency
-            bg_color = 0.5 * np.ones(3)
-            colors = np.array([255 * c[:-1] if c[-1] == 1 else
-                               255 * (c[:-1] * c[-1] + bg_color *
-                               (1 - c[-1])) for c in colors])
+            alphas = colors[:, -1]
+            bg_color = 0.5 * np.ones((len(alphas), 3))
+            colors = 255 * (alphas * colors[:, :-1].transpose() +
+                            (1 - alphas) * bg_color.transpose())
+            colors = colors.transpose()
 
             colors = colors.astype(int)
             colors = ['#%02x%02x%02x' % tuple(c) for c in colors]
@@ -567,8 +568,8 @@ def plot_source_estimates(stc, subject=None, surface='inflated', hemi='lh',
                 ctrl_pts = (input_fmin.value,
                             input_fmid.value,
                             input_fmax.value)
-                dt_min = input_fmin.value
-                dt_max = input_fmax.value
+                time_idx_new = int(slider.value)
+                stc_data = morph_mat.dot(stc.data[:, time_idx_new])
 
                 if not ctrl_pts[0] < ctrl_pts[1] < ctrl_pts[2]:
                     raise ValueError('Incorrect relationship between' +
@@ -581,9 +582,13 @@ def plot_source_estimates(stc, subject=None, surface='inflated', hemi='lh',
                 if isinstance(lim_cmap, str):
                     # 'hot' color map
                     scale_pts = ctrl_pts
+                    dt_min = input_fmin.value
+                    dt_max = input_fmax.value
                 else:
                     # 'mne' color map
                     scale_pts = (-ctrl_pts[-1], 0, ctrl_pts[-1])
+                    dt_min = -input_fmax.value
+                    dt_max = input_fmax.value
 
                 cmap = _calculate_cmap(lim_cmap, alpha, ctrl_pts, scale_pts)
                 k = 1 / (dt_max - dt_min)
@@ -602,9 +607,10 @@ def plot_source_estimates(stc, subject=None, surface='inflated', hemi='lh',
 
                 colors = cmap(cbar_data)
                 # transform to [0, 255] range taking into account transparency
-                colors = np.array([255 * c[:-1] if c[-1] == 1 else
-                                   255 * (c[:-1] * c[-1] + bg_color *
-                                   (1 - c[-1])) for c in colors])
+                alphas = colors[:, -1]
+                colors = 255 * (alphas * colors[:, :-1].transpose() +
+                                (1 - alphas) * bg_color.transpose())
+                colors = colors.transpose()
 
                 colors = colors.astype(int)
                 colors = ['#%02x%02x%02x' % tuple(c) for c in colors]
