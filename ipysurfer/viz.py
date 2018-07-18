@@ -1,183 +1,202 @@
+import os.path as path
+
 import ipyvolume as ipv
-from matplotlib import cm
-from matplotlib.colors import ListedColormap
-from mne.viz._3d import _limits_to_control_points
-import numpy as np
 from pythreejs import (BlendFactors, BlendingMode, Equations, ShaderMaterial,
                        Side)
 
+from .io import read_brain_mesh, read_morph
 from ._utils import _offset_hemi
 
 
-def plot_brain_mesh(rh_vertices=None,
-                    lh_vertices=None,
-                    rh_faces=None,
-                    lh_faces=None,
-                    rh_color='grey',
-                    lh_color='grey',
-                    act_data=None,
-                    cmap_str='auto',
-                    offset=0.0,
-                    fig_size=(500, 500),
-                    azimuth=90,
-                    elevation=90):
-    u"""Plot triangular format Freesurfer surface of the brain.
+lh_viewdict = {'lateral': {'v': (180., 90.), 'r': 90.},
+               'medial': {'v': (0., 90.), 'r': -90.},
+               'rostral': {'v': (90., 90.), 'r': -180.},
+               'caudal': {'v': (270., 90.), 'r': 0.},
+               'dorsal': {'v': (180., 0.), 'r': 90.},
+               'ventral': {'v': (180., 180.), 'r': 90.},
+               'frontal': {'v': (120., 80.), 'r': 106.739},
+               'parietal': {'v': (-120., 60.), 'r': 49.106}}
+rh_viewdict = {'lateral': {'v': (180., -90.), 'r': -90.},
+               'medial': {'v': (0., -90.), 'r': 90.},
+               'rostral': {'v': (-90., -90.), 'r': 180.},
+               'caudal': {'v': (90., -90.), 'r': 0.},
+               'dorsal': {'v': (180., 0.), 'r': 90.},
+               'ventral': {'v': (180., 180.), 'r': 90.},
+               'frontal': {'v': (60., 80.), 'r': -106.739},
+               'parietal': {'v': (-60., 60.), 'r': -49.106}}
+viewdicts = dict(lh=lh_viewdict, rh=rh_viewdict)
+
+
+class Brain:
+    u"""Class for visualizing a brain using multiple views in ipyvolume.
 
     Parameters
     ----------
-    rh_vertices : numpy.array, optional
-        Array of right hemisphere vertex (x, y, z) coordinates, of size
-        number_of_vertices x 3. Default is None.
-    lh_vertices : numpy.array, optional
-        Array of left hemisphere vertex (x, y, z) coordinates, of size
-        number_of_vertices x 3. Default is None.
-    rh_faces : numpy.array, optional
-        Array defining right hemisphere mesh triangles, of size
-        number_of_faces x 3. Default is None.
-    lh_faces : numpy.array, optional
-        Array defining mesh triangles, of size number_of_faces x 3.
-        Default is None.
-    rh_color : str | numpy.array, optional
-        Color for each point/vertex/symbol of the right hemisphere,
-        can be string format, examples for red:’red’, ‘#f00’, ‘#ff0000’ or
-        ‘rgb(1,0,0), or rgb array of shape (N, 3). Default value is 'grey'.
-    lh_color : str | numpy.array, optional
-        Color for each point/vertex/symbol of the left hemisphere,
-        can be string format, examples for red:’red’, ‘#f00’, ‘#ff0000’ or
-        ‘rgb(1,0,0), or rgb array of shape (N, 3). Default value is 'grey'.
-    act_data : numpy.array, optional
-        Activation data for for each hemisphere.
-    cmap_str : "hot" | "mne" | auto", optional
-        Which color map to use. Default value is "auto".
-    offset : float | int | None, optional
-        If 0.0, the surface will be offset such that the medial wall is
-        aligned with the origin. If not 0.0, an additional offset will
-        be used. If None no offset will be applied.
-    fig_size : (int, int), optional
-        Width and height of the figure. Default is (500, 500).
-    azimuth : int, optional
-        Angle of rotation about the z-axis (pointing up) in degrees.
-        Default is 90.
-    elevation : int, optional
-        Vertical rotation where 90 means ‘up’, -90 means ‘down’, in degrees.
-        Default is 90.
+    subject_id : str
+        subject name in Freesurfer subjects dir.
+    hemi : str
+        hemisphere id (ie 'lh', 'rh', 'both', or 'split'). In the case
+        of 'both', both hemispheres are shown in the same window.
+        In the case of 'split' hemispheres are displayed side-by-side
+        in different viewing panes.
+    surf : str
+        freesurfer surface mesh name (ie 'white', 'inflated', etc.).
+    title : str
+        title for the window.
+    cortex : str, tuple, dict, or None
+        Specifies how the cortical surface is rendered. Options:
 
-    Returns
-    -------
-    fig : ipyvolume.Figure
-        Ipyvolume object presenting the figure.
-    rh_mesh : ipyvolume.Mesh
-        Ipyvolume object presenting the built mesh for right hemisphere.
-    lh_mesh : ipyvolume.Mesh
-        Ipyvolume object presenting the built mesh for right hemisphere.
+            1. The name of one of the preset cortex styles:
+            ``'classic'`` (default), ``'high_contrast'``,
+            ``'low_contrast'``, or ``'bone'``.
+            2. A color-like argument to render the cortex as a single
+            color, e.g. ``'red'`` or ``(0.1, 0.4, 1.)``. Setting
+            this to ``None`` is equivalent to ``(0.5, 0.5, 0.5)``.
+            3. The name of a colormap used to render binarized
+            curvature values, e.g., ``Grays``.
+            4. A list of colors used to render binarized curvature
+            values. Only the first and last colors are used. E.g.,
+            ['red', 'blue'] or [(1, 0, 0), (0, 0, 1)].
+            5. A container with four entries for colormap (string
+            specifying the name of a colormap), vmin (float
+            specifying the minimum value for the colormap), vmax
+            (float specifying the maximum value for the colormap),
+            and reverse (bool specifying whether the colormap
+            should be reversed. E.g., ``('Greys', -1, 2, False)``.
+            6. A dict of keyword arguments that is passed on to the
+            call to surface.
+    alpha : float in [0, 1]
+        Alpha level to control opacity of the cortical surface.
+    size : float or pair of floats
+        the size of the window, in pixels. can be one number to specify
+        a square window, or the (width, height) of a rectangular window.
+    background : matplotlib color
+        Color of the background.
+    foreground : matplotlib color
+        Color of the foreground (will be used for colorbars and text).
+        None (default) will use black or white depending on the value
+        of ``background``.
+    figure : list of mayavi.core.scene.Scene | None | int
+        If None (default), a new window will be created with the appropriate
+        views. For single view plots, the figure can be specified as int to
+        retrieve the corresponding Mayavi window.
+    subjects_dir : str | None
+        If not None, this directory will be used as the subjects directory
+        instead of the value set using the SUBJECTS_DIR environment
+        variable.
+    views : list | str
+        views to use.
+    offset : bool
+        If True, aligs origin with medial wall. Useful for viewing inflated
+        surface where hemispheres typically overlap (Default: True).
+    show_toolbar : bool
+        If True, toolbars will be shown for each view.
+    offscreen : bool
+        If True, rendering will be done offscreen (not shown). Useful
+        mostly for generating images or screenshots, but can be buggy.
+        Use at your own risk.
+    interaction : str
+        Can be "trackball" (default) or "terrain", i.e. a turntable-style
+        camera.
+    units : str
+        Can be 'm' or 'mm' (default).
+
+    Attributes
+    ----------
+    annot : list
+        List of annotations.
+    brains : list
+        List of the underlying brain instances.
+    contour : list
+        List of the contours.
+    foci : foci
+        The foci.
+    labels : dict
+        The labels.
+    overlays : dict
+        The overlays.
+    texts : dict
+        The text objects.
     """
-    rh_mesh = None
-    lh_mesh = None
 
-    fig = ipv.figure(width=fig_size[0], height=fig_size[1], lighting=True)
+    def __init__(self, subject_id, hemi, surf, title=None,
+                 cortex='classic', alpha=1.0, size=800, background='black',
+                 foreground=None, figure=None, subjects_dir=None,
+                 views=['lat'], offset=True, show_toolbar=False,
+                 offscreen=False, interaction=None, units='mm'):
+        # surf =  surface
+        # implement title
+        if cortex != 'classic':
+            raise NotImplementedError('Options for parameter "cortex" ' +
+                                      'is not yet supported.')
 
-    if act_data is not None:
-        ctrl_pts, rgb_cmap, scale_pts, _ =\
-            _limits_to_control_points('auto',
-                                      act_data,
-                                      cmap_str,
-                                      transparent=False,
-                                      fmt='matplotlib')
+        if figure is not None:
+            raise NotImplementedError('figure parameter' +
+                                      'has not been implemented yet.')
 
-        if isinstance(rgb_cmap, str):
-            # 'hot' color map
-            rgb_cmap = cm.get_cmap(rgb_cmap)
-            cmap = rgb_cmap(np.arange(rgb_cmap.N))
-            alphas = np.ones(rgb_cmap.N)
-            step = scale_pts[-1] / rgb_cmap.N
-            # coefficients for linear mapping
-            # from [ctrl_pts[0], ctrl_pts[1]) interval into [0, 1]
-            k = 1 / (ctrl_pts[1] - ctrl_pts[0])
-            b = - ctrl_pts[0] * k
+        if interaction is not None:
+            raise NotImplementedError('interaction parameter' +
+                                      'has not been implemented yet.')
+        self._hemi_vertices = {}
+        self._hemi_faces = {}
 
-            for i in range(0, rgb_cmap.N):
-                curr_pos = i * step
+        for h in ('lh', 'rh'):
+            mesh_folder = 'surf/{0}.{1}'.format(h, surf)
 
-                if (curr_pos < ctrl_pts[0]):
-                    alphas[i] = 0
-                elif (curr_pos >= ctrl_pts[0]) and (curr_pos < ctrl_pts[1]):
-                    alphas[i] = k * curr_pos + b
+            mesh_path = path.join(subjects_dir, subject_id, mesh_folder)
+
+            brain_vertices, brain_faces = read_brain_mesh(mesh_path)
+
+            self._hemi_vertices[h] = brain_vertices
+            self._hemi_faces[h] = brain_faces
+
+        if isinstance(size, int):
+            fig_w = size
+            fig_h = size
         else:
-            # mne color map
-            cmap = rgb_cmap(np.arange(rgb_cmap.N))
-            alphas = np.ones(rgb_cmap.N)
-            step = (scale_pts[-1] - scale_pts[0]) / rgb_cmap.N
-            # coefficients for linear mapping into [0, 1]
-            k_pos = 1 / (ctrl_pts[1] - ctrl_pts[0])
-            k_neg = -k_pos
-            b = - ctrl_pts[0] * k_pos
+            fig_w, fig_h = size
 
-            for i in range(0, rgb_cmap.N):
-                curr_pos = i * step + scale_pts[0]
+        if hemi in ('both', 'split'):
+            hemis = ('lh', 'rh')
+        else:
+            hemis = (hemi, )
 
-                if (curr_pos > -ctrl_pts[0]) and (curr_pos < ctrl_pts[0]):
-                    alphas[i] = 0
-                elif (curr_pos >= ctrl_pts[0]) and (curr_pos < ctrl_pts[1]):
-                    alphas[i] = k_pos * curr_pos + b
-                elif (curr_pos <= -ctrl_pts[0]) and (curr_pos > -ctrl_pts[1]):
-                    alphas[i] = k_neg * curr_pos + b
+        self._fig = ipv.figure(width=fig_w, height=fig_h, lighting=True)
+        self._hemi_meshes = {}
 
-        np.clip(alphas, 0, 1)
-        cmap[:, -1] = alphas
-        cmap = ListedColormap(cmap)
+        for hemi in hemis:
+            morph_folder = 'surf/{0}.curv'.format(hemi)
+            morph_path = path.join(subjects_dir, subject_id, morph_folder)
 
-        dt_min = act_data.min()
-        dt_max = act_data.max()
-        # data mapping into [0, 1] interval
-        k = 1 / (dt_max - dt_min)
-        b = 1 - k * dt_max
+            brain_vertices = self._hemi_vertices[hemi]
+            brain_faces = self._hemi_faces[hemi]
+            _, brain_color = read_morph(morph_path)
 
-        act_data = k * act_data + b
-        np.clip(act_data, 0, 1)
+            if (brain_vertices is not None) and (brain_faces is not None):
+                brain_vertices = _offset_hemi(brain_vertices, hemi)
 
-        lh_act_data = act_data[:len(lh_vertices)]
-        rh_act_data = act_data[len(lh_vertices):]
-    else:
-        rh_act_data = None
-        lh_act_data = None
-        cmap = None
+                _, hemi_mesh = _plot_hemisphere_mesh(brain_vertices,
+                                                     brain_faces,
+                                                     brain_color)
 
-    if (rh_vertices is not None) and (rh_faces is not None):
-        if offset is not None:
-            rh_vertices = _offset_hemi(rh_vertices, 'rh', offset)
+                self._hemi_meshes[hemi] = hemi_mesh
 
-        rh_mesh, _ = plot_hemisphere_mesh(rh_vertices,
-                                          rh_faces,
-                                          rh_color,
-                                          act_data=rh_act_data,
-                                          cmap=cmap)
-
-    if (lh_vertices is not None) and (lh_faces is not None):
-        if offset is not None:
-            lh_vertices = _offset_hemi(lh_vertices, 'lh', offset)
-
-        lh_mesh, _ = plot_hemisphere_mesh(lh_vertices,
-                                          lh_faces,
-                                          lh_color,
-                                          act_data=lh_act_data,
-                                          cmap=cmap)
-
-    ipv.style.box_off()
-    ipv.style.axes_off()
-    ipv.style.background_color('black')
-
-    ipv.view(azimuth, elevation)
-    ipv.squarelim()
-    ipv.show()
-
-    return fig, rh_mesh, lh_mesh
+        ipv.style.box_off()
+        ipv.style.axes_off()
+        ipv.style.background_color(background)
+        # TODO: how extract azimuth and elevation from cuurent
+        # views representation
+        # or should I stick to the ones I have from MNE?
+        # ipv.view(views_dict[views]['azim'], views_dict[views]['elev'])
+        ipv.squarelim()
+        ipv.show()
 
 
-def plot_hemisphere_mesh(vertices,
-                         faces,
-                         color='grey',
-                         act_data=None,
-                         cmap=None):
+def _plot_hemisphere_mesh(vertices,
+                          faces,
+                          color='grey',
+                          act_data=None,
+                          cmap=None):
     u"""Plot triangular format Freesurfer surface of the brain hemispheres.
 
     Parameters
