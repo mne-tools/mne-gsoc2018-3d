@@ -342,8 +342,8 @@ def plot_source_estimates(stc, subject=None, surface='inflated', hemi='lh',
 
     Returns
     -------
-    figure : ipyvolume.Figure | [ipyvolume.Figure]
-        An instance of ipyvolume figure or a list of figures.
+    figure : [ipyvolume.Figure]
+        A list of figures.
     """
     if not isinstance(stc, SourceEstimate):
         raise ValueError('stc has to be a surface source estimate')
@@ -357,9 +357,14 @@ def plot_source_estimates(stc, subject=None, surface='inflated', hemi='lh',
                   'fro': {'elev': 5, 'azim': 110},
                   'par': {'elev': 5, 'azim': -110}}
 
-    if views not in views_dict:
-        raise ValueError('Views must be one of ["lat", "med", "fos", "cau", '
-                         '"dor", "ven", "fro", "par"]. Got {0}.'.format(views))
+    if (not isinstance(views, list)) and (not isinstance(views, tuple)):
+        views = (views,)
+
+    for view in views:
+        if view not in views_dict:
+            raise ValueError('Views must be one of ["lat", "med", "fos", ' +
+                             '"cau", "dor", "ven", "fro", "par"].' +
+                             'Got {0}.'.format(views))
 
     subjects_dir = get_subjects_dir(subjects_dir=subjects_dir,
                                     raise_error=True)
@@ -441,63 +446,79 @@ def plot_source_estimates(stc, subject=None, surface='inflated', hemi='lh',
     title = subject if len(hemis) > 1 else '%s - %s' % (subject, hemis[0])
     title = title.capitalize()
 
-    if hemi != 'split':
-        fig = ipv.figure(width=fig_w, height=fig_h, lighting=True)
-        fig.animation = 0
-        figs = None
-    else:
-        figs = []
-
     hemi_meshes = {}
 
-    for h in hemis:
-        if h == 'lh':
-            data = stc_data[:len(hemi_vertices['lh'])]
+    figs = []
+
+    for view in views:
+        figs_row = None
+
+        # if we have one or two hemis on the same plot
+        if hemi != 'split':
+            fig = ipv.figure(width=fig_w, height=fig_h, lighting=True)
+            fig.animation = 0
+
+        for h in hemis:
+            if h == 'lh':
+                data = stc_data[:len(hemi_vertices['lh'])]
+            else:
+                data = stc_data[len(hemi_vertices['lh']):]
+
+            if len(data) > 0:
+                data = k * data + b
+                np.clip(data, 0, 1)
+
+                act_colors = cmap(data)
+
+                morph_folder = 'surf/{0}.curv'.format(h)
+
+                morph_path = path.join(subjects_dir, subject, morph_folder)
+
+                brain_vertices = hemi_vertices[h]
+                brain_faces = hemi_faces[h]
+                _, brain_color = read_morph(morph_path)
+
+                if (brain_vertices is not None) and (brain_faces is not None):
+                    brain_vertices = offset_hemi(brain_vertices, h)
+
+                    if hemi == 'split':
+                        fig = ipv.figure(width=fig_w,
+                                         height=fig_h,
+                                         lighting=True)
+                        fig.animation = 0
+
+                        if figs_row is None:
+                            figs_row = [fig]
+                        else:
+                            figs_row.append(fig)
+
+                    _, hemi_mesh = plot_hemisphere_mesh(brain_vertices,
+                                                        brain_faces,
+                                                        brain_color,
+                                                        act_colors=act_colors)
+                    ipv.style.box_off()
+                    ipv.style.axes_off()
+                    ipv.style.background_color(background)
+                    ipv.view(views_dict[view]['azim'],
+                             views_dict[view]['elev'])
+                    ipv.squarelim()
+
+                    hemi_meshes[h + '_' + view] = hemi_mesh
+        if figs_row is not None:
+            figs.append(figs_row)
         else:
-            data = stc_data[len(hemi_vertices['lh']):]
+            figs.append(fig)
 
-        if len(data) > 0:
-            data = k * data + b
-            np.clip(data, 0, 1)
-
-            act_colors = cmap(data)
-
-            morph_folder = 'surf/{0}.curv'.format(h)
-
-            morph_path = path.join(subjects_dir, subject, morph_folder)
-
-            brain_vertices = hemi_vertices[h]
-            brain_faces = hemi_faces[h]
-            _, brain_color = read_morph(morph_path)
-
-            if (brain_vertices is not None) and (brain_faces is not None):
-                brain_vertices = offset_hemi(brain_vertices, h)
-
-                if hemi == 'split':
-                    fig = ipv.figure(width=fig_w // 2,
-                                     height=fig_h // 2,
-                                     lighting=True)
-                    fig.animation = 0
-                    figs.append(fig)
-
-                _, hemi_mesh = plot_hemisphere_mesh(brain_vertices,
-                                                    brain_faces,
-                                                    brain_color,
-                                                    act_colors=act_colors)
-                ipv.style.box_off()
-                ipv.style.axes_off()
-                ipv.style.background_color(background)
-                ipv.view(views_dict[views]['azim'], views_dict[views]['elev'])
-                ipv.squarelim()
-
-                hemi_meshes[h] = hemi_mesh
     title_w = widgets.HTML(value='<p style="color: {0}">'.format(foreground) +
                            '<b>{0}</b></p>'.format(title))
     if hemi == 'split':
-        ipv.gcc().children = (title_w,
-                              widgets.HBox(figs))
+        hboxes = []
+        for figs_row in figs:
+            hboxes.append(widgets.HBox(figs_row))
+
+        ipv.gcc().children = (title_w, *hboxes)
     else:
-        ipv.gcc().children = (title_w, *ipv.gcc().children)
+        ipv.gcc().children = (title_w, *figs)
 
     if time_viewer:
         control = ipv.animation_control(tuple(hemi_meshes.values()),
@@ -522,16 +543,17 @@ def plot_source_estimates(stc, subject=None, surface='inflated', hemi='lh',
             time_idx_new = int(change.new)
             stc_data = morph_mat.dot(stc.data[:, time_idx_new])
 
-            for h in hemis:
-                if h == 'lh':
-                    data = stc_data[:len(hemi_vertices['lh'])]
-                else:
-                    data = stc_data[len(hemi_vertices['lh']):]
+            for view in views:
+                for h in hemis:
+                    if h == 'lh':
+                        data = stc_data[:len(hemi_vertices['lh'])]
+                    else:
+                        data = stc_data[len(hemi_vertices['lh']):]
 
-                data = k * data + b
-                np.clip(data, 0, 1)
-                act_color_new = cmap(data)
-                hemi_meshes[h].color = act_color_new
+                    data = k * data + b
+                    np.clip(data, 0, 1)
+                    act_color_new = cmap(data)
+                    hemi_meshes[h + '_' + view].color = act_color_new
 
             # change label value
             if isinstance(time_label, str):
@@ -626,16 +648,17 @@ def plot_source_estimates(stc, subject=None, surface='inflated', hemi='lh',
                 k = 1 / (dt_max - dt_min)
                 b = 1 - k * dt_max
 
-                for h in hemis:
-                    if h == 'lh':
-                        data = stc_data[:len(hemi_vertices['lh'])]
-                    else:
-                        data = stc_data[len(hemi_vertices['lh']):]
+                for view in views:
+                    for h in hemis:
+                        if h == 'lh':
+                            data = stc_data[:len(hemi_vertices['lh'])]
+                        else:
+                            data = stc_data[len(hemi_vertices['lh']):]
 
-                    data = k * data + b
-                    np.clip(data, 0, 1)
-                    act_color_new = cmap(data)
-                    hemi_meshes[h].color = act_color_new
+                        data = k * data + b
+                        np.clip(data, 0, 1)
+                        act_color_new = cmap(data)
+                        hemi_meshes[h + '_' + view].color = act_color_new
 
                 colors = cmap(cbar_data)
                 # transform to [0, 255] range taking into account transparency
@@ -668,4 +691,4 @@ def plot_source_estimates(stc, subject=None, surface='inflated', hemi='lh',
 
     ipv.show()
 
-    return figs or fig
+    return figs
