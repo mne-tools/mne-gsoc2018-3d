@@ -1,11 +1,8 @@
-import os.path as path
 
 import ipyvolume as ipv
 from pythreejs import (BlendFactors, BlendingMode, Equations, ShaderMaterial,
                        Side)
-
-from .io import read_brain_mesh, read_morph
-from ._utils import _offset_hemi
+from ._utils import Surface
 
 
 lh_viewdict = {'lateral': {'v': (180., 90.), 'r': 90.},
@@ -129,6 +126,8 @@ class Brain:
         if cortex != 'classic':
             raise NotImplementedError('Options for parameter "cortex" ' +
                                       'is not yet supported.')
+        if hemi == 'split':
+            raise NotImplementedError('hemi="split" is not yet implemented.')
 
         if figure is not None:
             raise NotImplementedError('figure parameter' +
@@ -137,18 +136,19 @@ class Brain:
         if interaction is not None:
             raise NotImplementedError('interaction parameter' +
                                       'has not been implemented yet.')
-        self._hemi_vertices = {}
-        self._hemi_faces = {}
 
-        for h in ('lh', 'rh'):
-            mesh_folder = 'surf/{0}.{1}'.format(h, surf)
+        self._units = units
 
-            mesh_path = path.join(subjects_dir, subject_id, mesh_folder)
+        # load geometry for one or both hemispheres as necessary
+        offset = None if (not offset or hemi != 'both') else 0.0
 
-            brain_vertices, brain_faces = read_brain_mesh(mesh_path)
-
-            self._hemi_vertices[h] = brain_vertices
-            self._hemi_faces[h] = brain_faces
+        if hemi in ('both', 'split'):
+            hemis = ('lh', 'rh')
+        elif hemi in ('lh', 'rh'):
+            hemis = (hemi, )
+        else:
+            raise ValueError('hemi has to be either "lh", "rh", "split", ' +
+                             'or "both"')
 
         if isinstance(size, int):
             fig_w = size
@@ -156,30 +156,23 @@ class Brain:
         else:
             fig_w, fig_h = size
 
-        if hemi in ('both', 'split'):
-            hemis = ('lh', 'rh')
-        else:
-            hemis = (hemi, )
-
+        self.geo = {}
         self._fig = ipv.figure(width=fig_w, height=fig_h, lighting=True)
         self._hemi_meshes = {}
 
-        for hemi in hemis:
-            morph_folder = 'surf/{0}.curv'.format(hemi)
-            morph_path = path.join(subjects_dir, subject_id, morph_folder)
+        for h in hemis:
+            # Initialize a Surface object as the geometry
+            geo = Surface(subject_id, h, surf, subjects_dir, offset,
+                          units=self._units)
+            # Load in the geometry and curvature
+            geo.load_geometry()
+            geo.load_curvature()
 
-            brain_vertices = self._hemi_vertices[hemi]
-            brain_faces = self._hemi_faces[hemi]
-            _, brain_color = read_morph(morph_path)
-
-            if (brain_vertices is not None) and (brain_faces is not None):
-                brain_vertices = _offset_hemi(brain_vertices, hemi)
-
-                _, hemi_mesh = _plot_hemisphere_mesh(brain_vertices,
-                                                     brain_faces,
-                                                     brain_color)
-
-                self._hemi_meshes[hemi] = hemi_mesh
+            _, hemi_mesh = _plot_hemisphere_mesh(geo.coords,
+                                                 geo.faces,
+                                                 geo.grey_curv)
+            self.geo[h] = geo
+            self._hemi_meshes[hemi] = hemi_mesh
 
         ipv.style.box_off()
         ipv.style.axes_off()
