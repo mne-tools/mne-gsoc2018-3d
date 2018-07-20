@@ -588,11 +588,12 @@ def plot_source_estimates(stc, subject=None, surface='inflated', hemi='lh',
                            color=color,
                            scales={'x': x_sc, 'color': col_sc})
 
+            cbar_w = 500
             cbar_fig_margin = {'top': 15, 'bottom': 15, 'left': 5, 'right': 5}
             cbar_fig = Figure(axes=[ax_x],
                               marks=[heat],
                               fig_margin=cbar_fig_margin,
-                              layout=widgets.Layout(width='%dpx' % fig_w,
+                              layout=widgets.Layout(width='%dpx' % cbar_w,
                                                     height='60px'))
             input_fmin = widgets.BoundedFloatText(value=round(ctrl_pts[0], 2),
                                                   min=dt_min,
