@@ -1,3 +1,4 @@
+from collections import namedtuple
 
 import ipyvolume as ipv
 from pythreejs import (BlendFactors, BlendingMode, Equations, ShaderMaterial,
@@ -5,23 +6,17 @@ from pythreejs import (BlendFactors, BlendingMode, Equations, ShaderMaterial,
 from ._utils import Surface
 
 
-lh_viewdict = {'lateral': {'v': (180., 90.), 'r': 90.},
-               'medial': {'v': (0., 90.), 'r': -90.},
-               'rostral': {'v': (90., 90.), 'r': -180.},
-               'caudal': {'v': (270., 90.), 'r': 0.},
-               'dorsal': {'v': (180., 0.), 'r': 90.},
-               'ventral': {'v': (180., 180.), 'r': 90.},
-               'frontal': {'v': (120., 80.), 'r': 106.739},
-               'parietal': {'v': (-120., 60.), 'r': 49.106}}
-rh_viewdict = {'lateral': {'v': (180., -90.), 'r': -90.},
-               'medial': {'v': (0., -90.), 'r': 90.},
-               'rostral': {'v': (-90., -90.), 'r': 180.},
-               'caudal': {'v': (90., -90.), 'r': 0.},
-               'dorsal': {'v': (180., 0.), 'r': 90.},
-               'ventral': {'v': (180., 180.), 'r': 90.},
-               'frontal': {'v': (60., 80.), 'r': -106.739},
-               'parietal': {'v': (-60., 60.), 'r': -49.106}}
-viewdicts = dict(lh=lh_viewdict, rh=rh_viewdict)
+View = namedtuple('View', 'elev azim')
+
+
+views_dict = {'lateral': View(elev=5, azim=0),
+                'medial': View(elev=5, azim=180),
+                'rostral': View(elev=5, azim=90),
+                'caudal': View(elev=5, azim=-90),
+                'dorsal': View(elev=90, azim=0),
+                'ventral': View(elev=-90, azim=0),
+                'frontal': View(elev=5, azim=110),
+                'parietal': View(elev=5, azim=-110)}
 
 
 class Brain:
@@ -119,7 +114,7 @@ class Brain:
     def __init__(self, subject_id, hemi, surf, title=None,
                  cortex='classic', alpha=1.0, size=800, background='black',
                  foreground=None, figure=None, subjects_dir=None,
-                 views=['lat'], offset=True, show_toolbar=False,
+                 views=['lateral'], offset=True, show_toolbar=False,
                  offscreen=False, interaction=None, units='mm'):
         # surf =  surface
         # implement title
@@ -160,29 +155,27 @@ class Brain:
         self._fig = ipv.figure(width=fig_w, height=fig_h, lighting=True)
         self._hemi_meshes = {}
 
-        for h in hemis:
-            # Initialize a Surface object as the geometry
-            geo = Surface(subject_id, h, surf, subjects_dir, offset,
-                          units=self._units)
-            # Load in the geometry and curvature
-            geo.load_geometry()
-            geo.load_curvature()
+        for view in views:
+            for h in hemis:
+                # Initialize a Surface object as the geometry
+                geo = Surface(subject_id, h, surf, subjects_dir, offset,
+                            units=self._units)
+                # Load in the geometry and curvature
+                geo.load_geometry()
+                geo.load_curvature()
 
-            _, hemi_mesh = _plot_hemisphere_mesh(geo.coords,
-                                                 geo.faces,
-                                                 geo.grey_curv)
-            self.geo[h] = geo
-            self._hemi_meshes[hemi] = hemi_mesh
+                _, hemi_mesh = _plot_hemisphere_mesh(geo.coords,
+                                                    geo.faces,
+                                                    geo.grey_curv)
+                self.geo[h] = geo
+                self._hemi_meshes[hemi] = hemi_mesh
 
-        ipv.style.box_off()
-        ipv.style.axes_off()
-        ipv.style.background_color(background)
-        # TODO: how extract azimuth and elevation from cuurent
-        # views representation
-        # or should I stick to the ones I have from MNE?
-        # ipv.view(views_dict[views]['azim'], views_dict[views]['elev'])
-        ipv.squarelim()
-        ipv.show()
+            ipv.style.box_off()
+            ipv.style.axes_off()
+            ipv.style.background_color(background)
+            ipv.view(views_dict[view].azim, views_dict[view].elev)
+            ipv.squarelim()
+            ipv.show()
 
 
 def _plot_hemisphere_mesh(vertices,
