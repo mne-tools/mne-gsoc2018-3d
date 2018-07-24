@@ -1,4 +1,5 @@
 import os.path as path
+import sys
 
 from bqplot import Axis, ColorScale, Figure, HeatMap, LinearScale
 import ipyvolume as ipv
@@ -570,6 +571,13 @@ def plot_source_estimates(stc, subject=None, surface='inflated', hemi='lh',
             cbar_ticks = np.linspace(dt_min, dt_max, cmap.N)
             color = np.array((cbar_data, cbar_data))
 
+            if isinstance(lim_cmap, str):
+                # 'hot' color map
+                sl_min = -sys.float_info.max
+            else:
+                # 'mne' color map
+                sl_min = 0
+
             colors = cmap(cbar_data)
             # transform to [0, 255] range taking into account transparency
             alphas = colors[:, -1]
@@ -596,20 +604,17 @@ def plot_source_estimates(stc, subject=None, surface='inflated', hemi='lh',
                               layout=widgets.Layout(width='%dpx' % cbar_w,
                                                     height='60px'))
             input_fmin = widgets.BoundedFloatText(value=round(ctrl_pts[0], 2),
-                                                  min=dt_min,
-                                                  max=dt_max,
+                                                  min=sl_min,
                                                   description='Fmin:',
                                                   step=0.1,
                                                   disabled=False)
             input_fmid = widgets.BoundedFloatText(value=round(ctrl_pts[1], 2),
-                                                  min=dt_min,
-                                                  max=dt_max,
+                                                  min=sl_min,
                                                   description='Fmid:',
                                                   step=0.1,
                                                   disabled=False)
             input_fmax = widgets.BoundedFloatText(value=round(ctrl_pts[2], 2),
-                                                  min=dt_min,
-                                                  max=dt_max,
+                                                  min=sl_min,
                                                   description='Fmax:',
                                                   step=0.1,
                                                   disabled=False)
@@ -667,14 +672,17 @@ def plot_source_estimates(stc, subject=None, surface='inflated', hemi='lh',
                 colors = 255 * (alphas * colors[:, :-1].transpose() +
                                 (1 - alphas) * bg_color.transpose())
                 colors = colors.transpose()
+                cbar_ticks = np.linspace(dt_min, dt_max, cmap.N)
 
                 colors = colors.astype(int)
                 colors = ['#%02x%02x%02x' % tuple(c) for c in colors]
-                col_sc = ColorScale(colors=colors)
+                x_sc, col_sc = LinearScale(), ColorScale(colors=colors)
+                ax_x = Axis(scale=x_sc)
 
                 heat = HeatMap(x=cbar_ticks,
                                color=color,
                                scales={'x': x_sc, 'color': col_sc})
+                cbar_fig.axes = [ax_x]
                 cbar_fig.marks = [heat]
 
             button_upd_mesh.on_click(on_update)
