@@ -43,4 +43,4 @@ pydocstyle:
 	pydocstyle
 
 codespell-error:  # running on travis
-	codespell -i 0 -q 7 -S $(CODESPELL_SKIPS) $(CODESPELL_DIRS)
+	codespell -i 0 -q 7 -S $(CODESPELL_SKIPS) $(CODESPELL_DIRS) --ignore-words=./dictionary.txt
