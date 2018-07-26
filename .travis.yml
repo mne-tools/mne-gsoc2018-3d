@@ -5,7 +5,8 @@ python:
   - 3.6
 sudo: false
 install:
-  - pip install codespell flake8 ipyvolume matplotlib mne numpy nibabel pydocstyle pythreejs scipy bqplot
+  - pip install codespell flake8 ipyvolume matplotlib mne numpy nibabel pydocstyle pythreejs scipy bqplot pytest
 script:
   - make pep
-  - python -c "import ipysurfer"  # just a smoke test for now
+  - pytest # unit tests
+  - python -c "import ipysurfer"  # a smoke test
