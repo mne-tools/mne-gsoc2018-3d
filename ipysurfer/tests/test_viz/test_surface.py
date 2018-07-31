@@ -2,7 +2,7 @@ import os
 
 import pytest
 
-from ..surface import Surface
+from ipysurfer.viz import Surface
 
 
 @pytest.fixture

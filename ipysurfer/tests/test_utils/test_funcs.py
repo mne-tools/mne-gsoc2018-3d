@@ -4,7 +4,7 @@ import numpy as np
 from numpy.testing import assert_array_equal
 import pytest
 
-from ..funcs import _check_units, _get_subjects_dir, _fast_cross_3d
+from ipysurfer._utils import _check_units, _get_subjects_dir, _fast_cross_3d
 
 
 def test_check_units():
@@ -26,7 +26,7 @@ def test_get_subjects_dir(get_subject_info):
     # should raise ValueError if no env variable defined
     with pytest.raises(ValueError):
         _get_subjects_dir()
-    # should find a global varible with subjects folder
+    # should find a global variable with subjects folder
     os.environ['SUBJECTS_DIR'] = subjects_dir
     assert _get_subjects_dir() == subjects_dir
     # should return correct folder path as output

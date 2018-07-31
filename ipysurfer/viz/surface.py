@@ -3,7 +3,7 @@ from os import path as path
 from nibabel import freesurfer
 import numpy as np
 
-from .funcs import _check_units, _compute_normals, _get_subjects_dir
+from .._utils import _check_units, _compute_normals, _get_subjects_dir
 
 
 class Surface:
