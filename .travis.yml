@@ -5,7 +5,8 @@ python:
   - 3.6
 sudo: false
 install:
-  - pip install codespell flake8 ipyvolume matplotlib mne numpy nibabel pydocstyle pythreejs scipy bqplot pytest
+  - pip install codespell flake8 ipyvolume matplotlib mne numpy nibabel pydocstyle pythreejs scipy bqplot
+  - pip install pytest pytest-cov
 script:
   - make pep
   - pytest # unit tests
