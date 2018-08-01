@@ -12,7 +12,7 @@ from nibabel import freesurfer
 import numpy as np
 
 from ._utils import _get_subjects_dir
-from .viz import Brain
+from .viz import Brain, TimeViewer
 
 
 def plot_source_estimates(stc, subject=None, surface='inflated', hemi='lh',
@@ -165,53 +165,11 @@ def plot_source_estimates(stc, subject=None, surface='inflated', hemi='lh',
 
     scaler = 1000. if time_unit == 'ms' else 1.
 
-    if initial_time is None:
-        time_idx = 0
-    else:
-        time_idx = np.argmin(np.abs(stc.times - initial_time / scaler))
-
     time_label, times = _handle_time(time_label, time_unit, stc.times)
-
-    hemi_vertices = {}
-    hemi_faces = {}
-
-    for h in ('lh', 'rh'):
-        mesh_folder = 'surf/{0}.{1}'.format(h, surface)
-
-        mesh_path = path.join(subjects_dir, subject, mesh_folder)
-
-        brain_vertices, brain_faces = freesurfer.read_geometry(mesh_path)
-        brain_faces = brain_faces.astype(np.uint32)
-
-        hemi_vertices[h] = brain_vertices
-        hemi_faces[h] = brain_faces
-
-    morph_vert_to = [np.arange(len(hemi_vertices['lh'])),
-                     np.arange(len(hemi_vertices['rh']))]
-
-    morph_mat = compute_morph_matrix(subject_from=subject,
-                                     subject_to=subject,
-                                     vertices_from=stc.vertices,
-                                     vertices_to=morph_vert_to,
-                                     smooth=smoothing_steps,
-                                     subjects_dir=subjects_dir)
-    stc_data = morph_mat.dot(stc.data[:, time_idx])
-
-    if isinstance(size, int):
-        fig_w = size
-        fig_h = size
-    else:
-        fig_w, fig_h = size
 
     # convert control points to locations in colormap
     ctrl_pts, lim_cmap, scale_pts, transparent = _limits_to_control_points(
         clim, stc.data.ravel(), colormap, transparent, fmt='matplotlib')
-
-    # data mapping into [0, 1] interval
-    dt_max = scale_pts[-1]
-    dt_min = scale_pts[0]
-    k = 1 / (dt_max - dt_min)
-    b = 1 - k * dt_max
 
     if hemi in ('both', 'split'):
         hemis = ('lh', 'rh')
@@ -223,16 +181,18 @@ def plot_source_estimates(stc, subject=None, surface='inflated', hemi='lh',
 
     brain_plot = Brain(subject, hemi, surface, size=size,
                        subjects_dir=subjects_dir, title=title,
-                       foreground=foreground)
+                       foreground=foreground, views=views)
     for h in hemis:
         if h == 'lh':
-            data = stc_data[:len(hemi_vertices['lh'])]
+            data = stc.data[:len(stc.vertices[0]), :]
+            hemi_idx = 0
         else:
-            data = stc_data[len(hemi_vertices['lh']):]
+            data = stc.data[len(stc.vertices[0]):, :]
+            hemi_idx = 1
+
+        vertices = stc.vertices[hemi_idx]
 
         if len(data) > 0:
-            data = k * data + b
-            data = np.clip(data, 0, 1)
             if isinstance(lim_cmap, str):
                 # 'hot' color map
                 center = None
@@ -242,52 +202,14 @@ def plot_source_estimates(stc, subject=None, surface='inflated', hemi='lh',
 
             brain_plot.add_data(data, min=ctrl_pts[0], mid=ctrl_pts[1],
                                 hemi=h, max=ctrl_pts[2], center=center,
-                                colormap=lim_cmap, alpha=alpha)
-    brain_plot.show()
-    # if time_viewer:
-    #     control = ipv.animation_control(tuple(hemi_meshes.values()),
-    #                                     sequence_length=len(stc.times),
-    #                                     add=False,
-    #                                     interval=500)
+                                colormap=lim_cmap, alpha=alpha,
+                                initial_time=initial_time,
+                                time=times, time_label=time_label,
+                                vertices=vertices, colorbar=colorbar)
+    if time_viewer:
+        TimeViewer(brain_plot)
 
-    #     slider = control.children[1]
-    #     slider.readout = False
-    #     slider.value = time_idx
-    #     if isinstance(time_label, str):
-    #         label = widgets.Label(time_label % times[time_idx])
-    #     elif callable(time_label):
-    #         label = widgets.Label(time_label(times[time_idx]))
-
-    #     # hadler for changing of selected time moment
-    #     def slider_handler(change):
-    #         # change plot
-    #         nonlocal cmap
-    #         nonlocal k
-    #         nonlocal b
-    #         time_idx_new = int(change.new)
-    #         stc_data = morph_mat.dot(stc.data[:, time_idx_new])
-
-    #         for view in views:
-    #             for h in hemis:
-    #                 if h == 'lh':
-    #                     data = stc_data[:len(hemi_vertices['lh'])]
-    #                 else:
-    #                     data = stc_data[len(hemi_vertices['lh']):]
-
-    #                 data = k * data + b
-    #                 np.clip(data, 0, 1)
-    #                 act_color_new = cmap(data)
-    #                 hemi_meshes[h + '_' + view].color = act_color_new
-
-    #         # change label value
-    #         if isinstance(time_label, str):
-    #             label.value = time_label % times[time_idx_new]
-    #         elif callable(time_label):
-    #             label.value = time_label(times[time_idx_new])
-
-    #     slider.observe(slider_handler, names='value')
-    #     control = widgets.HBox((*control.children, label))
-
+    brain_plot.show()    
     #     # create a colorbar
     #     if colorbar:
     #         cbar_data = np.linspace(0, 1, cmap.N)

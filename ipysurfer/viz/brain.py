@@ -4,8 +4,8 @@ import numpy as np
 from pythreejs import (BlendFactors, BlendingMode, Equations, ShaderMaterial,
                        Side)
 
-from .._utils import _calculate_cmap
-from .view import views_dict
+from .._utils import _calculate_lut, _mesh_edges, _smoothing_matrix
+from .view import views_dict, ColorBar
 from .surface import Surface
 
 
@@ -125,14 +125,19 @@ class Brain:
         self._title = title
         self._subject_id = subject_id
         self._views = views
+        # for now only one color bar can be added
+        # since it is the same for all figures
+        self._colorbar_added = False
+        # array of data used by TimeViewer
+        self._data = {}
 
         # load geometry for one or both hemispheres as necessary
         offset = None if (not offset or hemi != 'both') else 0.0
 
         if hemi in ('both', 'split'):
-            hemis = ('lh', 'rh')
+            self._hemis = ('lh', 'rh')
         elif hemi in ('lh', 'rh'):
-            hemis = (hemi, )
+            self._hemis = (hemi, )
         else:
             raise ValueError('hemi has to be either "lh", "rh", "split", ' +
                              'or "both"')
@@ -146,9 +151,9 @@ class Brain:
         self.geo = {}
         self._figures = [[] for v in views]
         self._hemi_meshes = {}
-        self._hemi_overlays = {}
+        self._overlays = {}
 
-        for h in hemis:
+        for h in self._hemis:
             # Initialize a Surface object as the geometry
             geo = Surface(subject_id, h, surf, subjects_dir, offset,
                           units=self._units)
@@ -158,7 +163,7 @@ class Brain:
             self.geo[h] = geo
 
         for ri, v in enumerate(views):
-            for ci, h in enumerate(hemis):
+            for ci, h in enumerate(self._hemis):
                 if ci == 0:
                     fig = ipv.figure(width=fig_w, height=fig_h, lighting=True)
                     fig.animation = 0
@@ -181,18 +186,6 @@ class Brain:
                 ipv.view(views_dict[v].azim, views_dict[v].elev)
                 ipv.squarelim()
         self._add_title()
-
-    def _add_title(self):
-        """Add title to the current figure."""
-        if self._title is None:
-            title = self._subject_id.capitalize()
-        else:
-            title = self._title
-
-        title_w = widgets.HTML('<p style="color: %s">' % self._foreground +
-                               '<b>%s</b></p>' % title)
-        hboxes = (widgets.HBox(f_row) for f_row in self._figures)
-        ipv.gcc().children = (title_w, *hboxes)
 
     def add_data(self, array, min=None, max=None, thresh=None,
                  colormap="auto", alpha=1,
@@ -224,11 +217,11 @@ class Brain:
             singleton (e.g., ``np.newaxis``) to create a "time" dimension
             and pass ``time_label=None``.
         min : float
-            min value in colormap (uses real min if None)
+            min value in colormap (uses real min if None).
         mid : float
-            intermediate value in colormap (middle between min and max if None)
+            intermediate value in colormap (middle between min and max if None).
         max : float
-            max value in colormap (uses real max if None)
+            max value in colormap (uses real max if None).
         thresh : None or float
             if not None, values below thresh will not be visible
         center : float or None
@@ -294,9 +287,32 @@ class Brain:
         # array should represent pre-processed data, in [0, 1] range
         if smoothing_steps is not None:
             raise ValueError('"smoothing_steps" is not supported yet.')
+        if len(array.shape) == 3:
+            raise ValueError('Vector values in "array" are not supported.')
+        # add selection of the appropriate data time_idx
+        # I can have 1D array or 2D arrays with data
 
         hemi = self._check_hemi(hemi)
         array = np.asarray(array)
+
+        if initial_time is None:
+            time_idx = 0
+        else:
+            time_idx = np.argmin(abs(time - initial_time))
+
+        self._data['time'] = time
+        self._data['initial_time'] = initial_time
+        self._data['time_label'] = time_label
+        self._data['time_idx'] = time_idx
+        # data specific for a hemi
+        self._data[hemi + '_array'] = array
+
+        if time is not None and len(array.shape) == 2:
+            # we have scalar_data with time dimension
+            act_data = array[:, time_idx]
+        else:
+            # we have scalar data without time
+            act_data = array
 
         if center is None:
             if min is None:
@@ -311,15 +327,42 @@ class Brain:
         if mid is None:
             mid = (min + max) / 2.
         _check_limits(min, mid, max, extra='')
+        self._data['alpha'] = alpha
+        self._data['colormap'] = colormap
+        self._data['center'] = center
+        self._data['min'] = min
+        self._data['mid'] = mid
+        self._data['max'] = max
 
-        ctrl_pts = (min, mid, max)
-        if center is None:
-            scale_pts = ctrl_pts
+        lut = self.update_lut()
+
+        # Create smoothing matrix if necessary
+        if len(act_data) < self.geo[hemi].x.shape[0]:
+            if vertices is None:
+                raise ValueError('len(data) < nvtx (%s < %s): the vertices '
+                                 'parameter must not be None'
+                                 % (len(act_data), self.geo[hemi].x.shape[0]))
+            adj_mat = _mesh_edges(self.geo[hemi].faces)
+            smooth_mat = _smoothing_matrix(vertices,
+                                           adj_mat,
+                                           smoothing_steps)
+            act_data = smooth_mat.dot(act_data)
+            self._data[hemi + '_smooth_mat'] = smooth_mat
         else:
-            scale_pts = (-1 * max, center, max)
+            smooth_mat = None
 
-        cmap = _calculate_cmap(colormap, alpha, ctrl_pts, scale_pts)
-        act_color = cmap(array)
+        # data mapping into [0, 1] interval
+        dt_max = max
+        dt_min = min if center is None else -1 * max
+        k = 1 / (dt_max - dt_min)
+        b = 1 - k * dt_max
+        act_data = k * act_data + b
+        act_data = np.clip(act_data, 0, 1)
+
+        act_color = lut(act_data)
+
+        self._data['k'] = k
+        self._data['b'] = b
 
         for ri, v in enumerate(self._views):
             if self._hemi != 'split':
@@ -330,11 +373,67 @@ class Brain:
             hemi_overlay = self._plot_hemi_overlay(self.geo[hemi].coords,
                                                    self.geo[hemi].faces,
                                                    act_color)
-            self._hemi_overlays[hemi + '_' + v] = hemi_overlay
+            self._overlays[hemi + '_' + v] = hemi_overlay
+
+        if colorbar and not self._colorbar_added:
+            ColorBar(self)
+            self._colorbar_added = True
 
     def show(self):
-        """Display widget."""
+        u"""Display widget."""
         ipv.show()
+
+    def update_lut(self, min=None, mid=None, max=None):
+        u"""Update color map.
+        
+        Parameters
+        ----------
+        min : float | None
+            min value in colormap (uses real min if None).
+        mid : float | None
+            intermediate value in colormap (middle between min and max if None).
+        max : float | None
+            max value in colormap (uses real max if None).
+        """
+        alpha = self._data['alpha']
+        center = self._data['center']
+        colormap = self._data['colormap']
+        min = self._data['min'] if min is None else min
+        mid = self._data['mid'] if mid is None else mid
+        max = self._data['max'] if max is None else max
+
+        lut = _calculate_lut(colormap, alpha=alpha, min=min, mid=mid, max=max,
+                              center=center)
+        self._data['lut'] = lut
+        return lut
+
+    @property
+    def overlays(self):
+        return self._overlays
+
+    @property
+    def data(self):
+        return self._data
+
+    @property
+    def views(self):
+        return self._views
+
+    @property
+    def hemis(self):
+        return self._hemis
+
+    def _add_title(self):
+        """Add title to the current figure."""
+        if self._title is None:
+            title = self._subject_id.capitalize()
+        else:
+            title = self._title
+
+        title_w = widgets.HTML('<p style="color: %s">' % self._foreground +
+                               '<b>%s</b></p>' % title)
+        hboxes = (widgets.HBox(f_row) for f_row in self._figures)
+        ipv.gcc().children = (title_w, *hboxes)
 
     def _plot_hemi_mesh(self,
                         vertices,

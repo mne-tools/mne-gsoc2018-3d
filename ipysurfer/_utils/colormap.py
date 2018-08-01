@@ -3,7 +3,7 @@ from matplotlib.colors import ListedColormap
 import numpy as np
 
 
-def _calculate_cmap(lim_cmap, alpha, ctrl_pts, scale_pts):
+def _calculate_lut(lim_cmap, alpha, min, mid, max, center=None):
     u"""Transparent color map calculation.
 
     Parameters
@@ -13,18 +13,26 @@ def _calculate_cmap(lim_cmap, alpha, ctrl_pts, scale_pts):
     alpha : float
         Alpha value to apply globally to the overlay. Has no effect with mpl
         backend.
-    ctrl_pts : tuple(float)
-        Color map control points.
-    scale_pts : tuple(float)
-        Data scale control points.
+    min : float
+        min value in colormap.
+    mid : float
+        intermediate value in colormap.
+    max : float
+        max value in colormap.
+    center : float or None
+        if not None, center of a divergent colormap, changes the meaning of
+        min, max and mid, see :meth:`scale_data_colormap` for further info.
 
     Returns
     -------
     cmap : matplotlib.ListedColormap
         Color map with transparency channel.
     """
-    if isinstance(lim_cmap, str):
-        # 'hot' color map
+    ctrl_pts = (min, mid, max)
+
+    if center is None:
+        # 'hot' or another linear color map
+        scale_pts = ctrl_pts
         rgb_cmap = cm.get_cmap(lim_cmap)
         # take 60% of hot color map, so it will be consistent
         # with mayavi plots
@@ -45,7 +53,8 @@ def _calculate_cmap(lim_cmap, alpha, ctrl_pts, scale_pts):
             elif (curr_pos < ctrl_pts[1]):
                 alphas[i] = k * curr_pos + b
     else:
-        # mne color map
+        # 'mne' or another divergent color map
+        scale_pts = (-1 * max, center, max)
         rgb_cmap = lim_cmap
         cmap = rgb_cmap(np.arange(rgb_cmap.N))
         alphas = np.ones(rgb_cmap.N)
