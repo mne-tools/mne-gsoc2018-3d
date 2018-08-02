@@ -1,15 +1,6 @@
-import os.path as path
-
-# from bqplot import Axis, ColorScale, Figure, HeatMap, LinearScale
-# import ipyvolume as ipv
-# import ipywidgets as widgets
-# from matplotlib import cm
-# from matplotlib.colors import ListedColormap
-from mne.source_estimate import compute_morph_matrix, SourceEstimate
+from mne.source_estimate import SourceEstimate
 from mne.utils import _check_subject
 from mne.viz._3d import _handle_time, _limits_to_control_points
-from nibabel import freesurfer
-import numpy as np
 
 from ._utils import _get_subjects_dir
 from .viz import Brain, TimeViewer
@@ -164,6 +155,7 @@ def plot_source_estimates(stc, subject=None, surface='inflated', hemi='lh',
                          'or "both"')
 
     scaler = 1000. if time_unit == 'ms' else 1.
+    initial_time /= scaler
 
     time_label, times = _handle_time(time_label, time_unit, stc.times)
 
@@ -193,13 +185,8 @@ def plot_source_estimates(stc, subject=None, surface='inflated', hemi='lh',
         vertices = stc.vertices[hemi_idx]
 
         if len(data) > 0:
-            if isinstance(lim_cmap, str):
-                # 'hot' color map
-                center = None
-            else:
-                # 'mne' color map
-                center = 0
-
+            # 'hot' or 'mne' color map
+            center = None if isinstance(lim_cmap, str) else 0
             brain_plot.add_data(data, min=ctrl_pts[0], mid=ctrl_pts[1],
                                 hemi=h, max=ctrl_pts[2], center=center,
                                 colormap=lim_cmap, alpha=alpha,
@@ -209,140 +196,5 @@ def plot_source_estimates(stc, subject=None, surface='inflated', hemi='lh',
     if time_viewer:
         TimeViewer(brain_plot)
 
-    brain_plot.show()    
-    #     # create a colorbar
-    #     if colorbar:
-    #         cbar_data = np.linspace(0, 1, cmap.N)
-    #         cbar_ticks = np.linspace(dt_min, dt_max, cmap.N)
-    #         color = np.array((cbar_data, cbar_data))
-
-    #         if isinstance(lim_cmap, str):
-    #             # 'hot' color map
-    #             sl_min = -sys.float_info.max
-    #         else:
-    #             # 'mne' color map
-    #             sl_min = 0
-
-    #         colors = cmap(cbar_data)
-    #         # transform to [0, 255] range taking into account transparency
-    #         alphas = colors[:, -1]
-    #         bg_color = 0.5 * np.ones((len(alphas), 3))
-    #         colors = 255 * (alphas * colors[:, :-1].transpose() +
-    #                         (1 - alphas) * bg_color.transpose())
-    #         colors = colors.transpose()
-
-    #         colors = colors.astype(int)
-    #         colors = ['#%02x%02x%02x' % tuple(c) for c in colors]
-
-    #         x_sc, col_sc = LinearScale(), ColorScale(colors=colors)
-    #         ax_x = Axis(scale=x_sc)
-
-    #         heat = HeatMap(x=cbar_ticks,
-    #                        color=color,
-    #                        scales={'x': x_sc, 'color': col_sc})
-
-    #         cbar_w = 500
-    #        cbar_fig_margin = {'top': 15, 'bottom': 15, 'left': 5, 'right': 5}
-    #         cbar_fig = Figure(axes=[ax_x],
-    #                           marks=[heat],
-    #                           fig_margin=cbar_fig_margin,
-    #                           layout=widgets.Layout(width='%dpx' % cbar_w,
-    #                                                 height='60px'))
-    #        input_fmin = widgets.BoundedFloatText(value=round(ctrl_pts[0], 2),
-    #                                               min=sl_min,
-    #                                               description='Fmin:',
-    #                                               step=0.1,
-    #                                               disabled=False)
-    #        input_fmid = widgets.BoundedFloatText(value=round(ctrl_pts[1], 2),
-    #                                               min=sl_min,
-    #                                               description='Fmid:',
-    #                                               step=0.1,
-    #                                               disabled=False)
-    #        input_fmax = widgets.BoundedFloatText(value=round(ctrl_pts[2], 2),
-    #                                               min=sl_min,
-    #                                               description='Fmax:',
-    #                                               step=0.1,
-    #                                               disabled=False)
-
-    #         button_upd_mesh = widgets.Button(description='Update mesh',
-    #                                          disabled=False,
-    #                                          button_style='',
-    #                                          tooltip='Update mesh')
-
-    #         def on_update(but_event):
-    #             ctrl_pts = (input_fmin.value,
-    #                         input_fmid.value,
-    #                         input_fmax.value)
-    #             time_idx_new = int(slider.value)
-    #             stc_data = morph_mat.dot(stc.data[:, time_idx_new])
-
-    #             if not ctrl_pts[0] < ctrl_pts[1] < ctrl_pts[2]:
-    #                 raise ValueError('Incorrect relationship between' +
-    #                                  ' fmin, fmid, fmax. Given values ' +
-    #                                  '{0}, {1}, {2}'.format(*ctrl_pts))
-    #             nonlocal cmap
-    #             nonlocal k
-    #             nonlocal b
-
-    #             if isinstance(lim_cmap, str):
-    #                 # 'hot' color map
-    #                 scale_pts = ctrl_pts
-    #                 dt_min = input_fmin.value
-    #                 dt_max = input_fmax.value
-    #             else:
-    #                 # 'mne' color map
-    #                 scale_pts = (-ctrl_pts[-1], 0, ctrl_pts[-1])
-    #                 dt_min = -input_fmax.value
-    #                 dt_max = input_fmax.value
-
-    #             cmap = _calculate_cmap(lim_cmap, alpha, ctrl_pts, scale_pts)
-    #             k = 1 / (dt_max - dt_min)
-    #             b = 1 - k * dt_max
-
-    #             for view in views:
-    #                 for h in hemis:
-    #                     if h == 'lh':
-    #                         data = stc_data[:len(hemi_vertices['lh'])]
-    #                     else:
-    #                         data = stc_data[len(hemi_vertices['lh']):]
-
-    #                     data = k * data + b
-    #                     np.clip(data, 0, 1)
-    #                     act_color_new = cmap(data)
-    #                     hemi_meshes[h + '_' + view].color = act_color_new
-
-    #             colors = cmap(cbar_data)
-    #            # transform to [0, 255] range taking into account transparency
-    #             alphas = colors[:, -1]
-    #             colors = 255 * (alphas * colors[:, :-1].transpose() +
-    #                             (1 - alphas) * bg_color.transpose())
-    #             colors = colors.transpose()
-    #             cbar_ticks = np.linspace(dt_min, dt_max, cmap.N)
-
-    #             colors = colors.astype(int)
-    #             colors = ['#%02x%02x%02x' % tuple(c) for c in colors]
-    #             x_sc, col_sc = LinearScale(), ColorScale(colors=colors)
-    #             ax_x = Axis(scale=x_sc)
-
-    #             heat = HeatMap(x=cbar_ticks,
-    #                            color=color,
-    #                            scales={'x': x_sc, 'color': col_sc})
-    #             cbar_fig.axes = [ax_x]
-    #             cbar_fig.marks = [heat]
-
-    #         button_upd_mesh.on_click(on_update)
-
-    #         info_widget = widgets.VBox((control,
-    #                                     cbar_fig,
-    #                                     input_fmin,
-    #                                     input_fmid,
-    #                                     input_fmax,
-    #                                     button_upd_mesh))
-
-    #         ipv.gcc().children += (info_widget,)
-    #     else:
-    #         ipv.gcc().children += (control,)
-
-    # ipv.show()
-
+    brain_plot.show()
     return 0

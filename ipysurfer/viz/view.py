@@ -4,8 +4,6 @@ import sys
 from bqplot import Axis, ColorScale, Figure, HeatMap, LinearScale
 import ipyvolume as ipv
 import ipywidgets as widgets
-from matplotlib import cm
-from matplotlib.colors import ListedColormap
 import numpy as np
 
 
@@ -81,11 +79,11 @@ class TimeViewer:
         ipv.gcc().children += (control,)
 
     def show(self):
-        """Display widget."""
+        u"""Display widget."""
         ipv.show()
 
     def _get_label(self, time):
-        """Return time label string.
+        u"""Return time label string.
 
         Parameters
         ----------
@@ -108,7 +106,14 @@ class TimeViewer:
 
 
 class ColorBar:
-    """Helper class for a color bar."""
+    u"""Helper class for visualizing a color bar.
+
+    Parameters
+    ----------
+    brain : Brain
+        Object with cortex mesh to be controlled by time
+        viewer.
+    """
 
     def __init__(self, brain):
         self._brain = brain
@@ -116,6 +121,7 @@ class ColorBar:
         self._input_fmid = None
         self._input_fmax = None
         self._btn_upd_mesh = None
+        self._colors = None
 
         if brain.data['center'] is None:
             dt_min = brain.data['min']
@@ -124,30 +130,20 @@ class ColorBar:
             dt_min = -brain.data['max']
             dt_max = brain.data['max']
 
-        lut = brain.data['lut']
-        cbar_data = np.linspace(0, 1, lut.N)
-        cbar_ticks = np.linspace(dt_min, dt_max, lut.N)
-        color = np.array((cbar_data, cbar_data))
+        self._lut = brain.data['lut']
+        self._cbar_data = np.linspace(0, 1, self._lut.N)
+        cbar_ticks = np.linspace(dt_min, dt_max, self._lut.N)
+        color = np.array((self._cbar_data, self._cbar_data))
         cbar_w = 500
         cbar_fig_margin = {'top': 15, 'bottom': 15, 'left': 5, 'right': 5}
+        self._update_colors()
 
-        colors = lut(cbar_data)
-        # transform to [0, 255] range taking into account transparency
-        alphas = colors[:, -1]
-        bg_color = 0.5 * np.ones((len(alphas), 3))
-        colors = 255 * (alphas * colors[:, :-1].transpose() +
-                        (1 - alphas) * bg_color.transpose())
-        colors = colors.transpose()
-
-        colors = colors.astype(int)
-        colors = ['#%02x%02x%02x' % tuple(c) for c in colors]
-
-        x_sc, col_sc = LinearScale(), ColorScale(colors=colors)
+        x_sc, col_sc = LinearScale(), ColorScale(colors=self._colors)
         ax_x = Axis(scale=x_sc)
-
         heat = HeatMap(x=cbar_ticks,
-                        color=color,
-                        scales={'x': x_sc, 'color': col_sc})
+                       color=color,
+                       scales={'x': x_sc, 'color': col_sc})
+
         self._add_inputs()
         fig_layout = widgets.Layout(width='%dpx' % cbar_w,
                                     height='60px')
@@ -157,6 +153,7 @@ class ColorBar:
                           layout=fig_layout)
 
         def on_update(but_event):
+            u"""Update button click event handler."""
             val_min = self._input_fmin.value
             val_mid = self._input_fmid.value
             val_max = self._input_fmax.value
@@ -166,8 +163,8 @@ class ColorBar:
             if not val_min < val_mid < val_max:
                 raise ValueError('Incorrect relationship between' +
                                  ' fmin, fmid, fmax. Given values ' +
-                                 '{0}, {1}, {2}'.format(val_min,
-                                 val_mid, val_max))
+                                 '{0}, {1}, {2}'
+                                 .format(val_min, val_mid, val_max))
             if center is None:
                 # 'hot' or another linear color map
                 dt_min = val_min
@@ -177,8 +174,8 @@ class ColorBar:
                 dt_min = -val_max
                 dt_max = val_max
 
-            lut = self._brain.update_lut(min=val_min, mid=val_mid,
-                                         max=val_max)
+            self._lut = self._brain.update_lut(min=val_min, mid=val_mid,
+                                               max=val_max)
             k = 1 / (dt_max - dt_min)
             b = 1 - k * dt_max
             self._brain.data['k'] = k
@@ -196,20 +193,10 @@ class ColorBar:
 
                     act_data = k * act_data + b
                     act_data = np.clip(act_data, 0, 1)
-                    act_color_new = lut(act_data)
+                    act_color_new = self._lut(act_data)
                     brain.overlays[h + '_' + v].color = act_color_new
-
-            colors = lut(cbar_data)
-            # transform to [0, 255] range taking into account transparency
-            alphas = colors[:, -1]
-            colors = 255 * (alphas * colors[:, :-1].transpose() +
-                            (1 - alphas) * bg_color.transpose())
-            colors = colors.transpose()
-            cbar_ticks = np.linspace(dt_min, dt_max, lut.N)
-
-            colors = colors.astype(int)
-            colors = ['#%02x%02x%02x' % tuple(c) for c in colors]
-            x_sc, col_sc = LinearScale(), ColorScale(colors=colors)
+            self._update_colors()
+            x_sc, col_sc = LinearScale(), ColorScale(colors=self._colors)
             ax_x = Axis(scale=x_sc)
 
             heat = HeatMap(x=cbar_ticks,
@@ -227,9 +214,24 @@ class ColorBar:
                                     self._btn_upd_mesh))
 
         ipv.gcc().children += (info_widget,)
-    
+
+    def _update_colors(self):
+        u"""Update or prepare list of colors for plotting."""
+        colors = self._lut(self._cbar_data)
+        # transform to [0, 255] range taking into account transparency
+        alphas = colors[:, -1]
+        bg_color = 0.5 * np.ones((len(alphas), 3))
+        colors = 255 * (alphas * colors[:, :-1].transpose() +
+                        (1 - alphas) * bg_color.transpose())
+        colors = colors.transpose()
+
+        colors = colors.astype(int)
+        colors = ['#%02x%02x%02x' % tuple(c) for c in colors]
+
+        self._colors = colors
+
     def _add_inputs(self):
-        """Add inputs and update button."""
+        u"""Add inputs and update button."""
         val_min = self._brain.data['min']
         val_mid = self._brain.data['mid']
         val_max = self._brain.data['max']

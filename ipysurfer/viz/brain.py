@@ -85,20 +85,10 @@ class Brain:
 
     Attributes
     ----------
-    annot : list
-        List of annotations.
-    brains : list
-        List of the underlying brain instances.
-    contour : list
-        List of the contours.
-    foci : foci
-        The foci.
-    labels : dict
-        The labels.
+    geo : dict
+        Cortex surface objects.
     overlays : dict
         The overlays.
-    texts : dict
-        The text objects.
     """
 
     def __init__(self, subject_id, hemi, surf, title=None,
@@ -163,37 +153,40 @@ class Brain:
             self.geo[h] = geo
 
         for ri, v in enumerate(views):
+            fig = ipv.figure(width=fig_w, height=fig_h, lighting=True)
+            fig.animation = 0
+            self._figures[ri].append(fig)
+            ipv.style.box_off()
+            ipv.style.axes_off()
+            ipv.style.background_color(background)
+            ipv.view(views_dict[v].azim, views_dict[v].elev)
+
             for ci, h in enumerate(self._hemis):
-                if ci == 0:
-                    fig = ipv.figure(width=fig_w, height=fig_h, lighting=True)
-                    fig.animation = 0
-                    self._figures[ri].append(fig)
-                elif ci == 1 and hemi == 'split':
+                if ci == 1 and hemi == 'split':
                     # create a separate figure for right hemisphere
                     fig = ipv.figure(width=fig_w, height=fig_h, lighting=True)
                     fig.animation = 0
                     self._figures[ri].append(fig)
+                    ipv.style.box_off()
+                    ipv.style.axes_off()
+                    ipv.style.background_color(background)
+                    ipv.view(views_dict[v].azim, views_dict[v].elev)
 
                 hemi_mesh = self._plot_hemi_mesh(self.geo[h].coords,
                                                  self.geo[h].faces,
                                                  self.geo[h].grey_curv)
                 self._hemi_meshes[h + '_' + v] = hemi_mesh
-
-                ipv.pylab.current.figure = fig
-                ipv.style.box_off()
-                ipv.style.axes_off()
-                ipv.style.background_color(background)
-                ipv.view(views_dict[v].azim, views_dict[v].elev)
                 ipv.squarelim()
+
         self._add_title()
 
     def add_data(self, array, min=None, max=None, thresh=None,
                  colormap="auto", alpha=1,
                  vertices=None, smoothing_steps=None, time=None,
                  time_label="time index=%d", colorbar=True,
-                 hemi=None, remove_existing=False, time_label_size=14,
+                 hemi=None, remove_existing=None, time_label_size=None,
                  initial_time=None, scale_factor=None, vector_alpha=None,
-                 mid=None, center=None, transparent=False, verbose=None):
+                 mid=None, center=None, transparent=None, verbose=None):
         u"""Display data from a numpy array on the surface.
 
         This provides a similar interface to
@@ -219,7 +212,8 @@ class Brain:
         min : float
             min value in colormap (uses real min if None).
         mid : float
-            intermediate value in colormap (middle between min and max if None).
+            intermediate value in colormap (middle between min and max
+            if None).
         max : float
             max value in colormap (uses real max if None).
         thresh : None or float
@@ -284,13 +278,25 @@ class Brain:
         Due to a Mayavi (or VTK) alpha rendering bug, ``vector_alpha`` is
         clamped to be strictly < 1.
         """
-        # array should represent pre-processed data, in [0, 1] range
-        if smoothing_steps is not None:
-            raise ValueError('"smoothing_steps" is not supported yet.')
         if len(array.shape) == 3:
             raise ValueError('Vector values in "array" are not supported.')
-        # add selection of the appropriate data time_idx
-        # I can have 1D array or 2D arrays with data
+        if thresh is not None:
+            raise NotImplementedError('"threshold" parameter is' +
+                                      ' not supported yet.')
+        if transparent is not None:
+            raise NotImplementedError('"trasparent" is not supported yet.')
+        if remove_existing is not None:
+            raise NotImplementedError('"remove_existing" is not' +
+                                      'supported yet.')
+        if time_label_size is not None:
+            raise NotImplementedError('"time_label_size" is not' +
+                                      'supported yet.')
+        if scale_factor is not None:
+            raise NotImplementedError('"scale_factor" is not supported yet.')
+        if vector_alpha is not None:
+            raise NotImplementedError('"vector_alpha" is not supported yet.')
+        if verbose is not None:
+            raise NotImplementedError('"verbose" is not supported yet.')
 
         hemi = self._check_hemi(hemi)
         array = np.asarray(array)
@@ -385,13 +391,14 @@ class Brain:
 
     def update_lut(self, min=None, mid=None, max=None):
         u"""Update color map.
-        
+
         Parameters
         ----------
         min : float | None
             min value in colormap (uses real min if None).
         mid : float | None
-            intermediate value in colormap (middle between min and max if None).
+            intermediate value in colormap (middle between min and max
+            if None).
         max : float | None
             max value in colormap (uses real max if None).
         """
@@ -403,7 +410,7 @@ class Brain:
         max = self._data['max'] if max is None else max
 
         lut = _calculate_lut(colormap, alpha=alpha, min=min, mid=mid, max=max,
-                              center=center)
+                             center=center)
         self._data['lut'] = lut
         return lut
 
@@ -413,6 +420,7 @@ class Brain:
 
     @property
     def data(self):
+        u"""Data used by time viewer and color bar widgets."""
         return self._data
 
     @property
@@ -424,7 +432,7 @@ class Brain:
         return self._hemis
 
     def _add_title(self):
-        """Add title to the current figure."""
+        u"""Add title to the current figure."""
         if self._title is None:
             title = self._subject_id.capitalize()
         else:
@@ -510,7 +518,7 @@ class Brain:
         return mesh_overlay
 
     def _check_hemi(self, hemi):
-        """Check for safe single-hemi input, returns str."""
+        u"""Check for safe single-hemi input, returns str."""
         if hemi is None:
             if self._hemi not in ['lh', 'rh']:
                 raise ValueError('hemi must not be None when both '
@@ -524,7 +532,7 @@ class Brain:
 
 
 def _check_limits(fmin, fmid, fmax, extra='f'):
-    """Check for monotonicity."""
+    u"""Check for monotonicity."""
     if fmin >= fmid:
         raise ValueError('%smin must be < %smid, got %0.4g >= %0.4g'
                          % (extra, extra, fmin, fmid))

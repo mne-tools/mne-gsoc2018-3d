@@ -108,7 +108,7 @@ class Surface:
             self.nn[:] = nn
 
     def __len__(self):
-        """Number of vertices."""
+        """Return number of vertices."""
         return len(self.coords)
 
     @property
