@@ -3,8 +3,26 @@ from matplotlib.colors import ListedColormap
 import numpy as np
 
 
-def _calculate_lut(lim_cmap, alpha, min, mid, max, center=None):
+def _calculate_lut(lim_cmap, alpha, fmin, fmid, fmax, center=None):
     u"""Transparent color map calculation.
+
+    A colormap may be sequential or divergent. When the colormap is
+    divergent indicate this by providing a value for 'center'. The
+    meanings of fmin, fmid and fmax are different for sequential and
+    divergent colormaps. A sequential colormap is characterised by::
+
+        [fmin, fmid, fmax]
+
+    where fmin and fmax define the edges of the colormap and fmid will be
+    the value mapped to the center of the originally chosen colormap.
+    A divergent colormap is characterised by::
+
+        [center-fmax, center-fmid, center-fmin, center,
+            center+fmin, center+fmid, center+fmax]
+
+    i.e., values between center-fmin and center+fmin will not be shown
+    while center-fmid will map to the middle of the first half of the
+    original colormap and center-fmid to the middle of the second half.
 
     Parameters
     ----------
@@ -13,25 +31,24 @@ def _calculate_lut(lim_cmap, alpha, min, mid, max, center=None):
     alpha : float
         Alpha value to apply globally to the overlay. Has no effect with mpl
         backend.
-    min : float
-        min value in colormap.
-    mid : float
-        intermediate value in colormap.
-    max : float
-        max value in colormap.
+    fmin : float
+        Min value in colormap.
+    fmid : float
+        Intermediate value in colormap.
+    fmax : float
+        Max value in colormap.
     center : float or None
-        if not None, center of a divergent colormap, changes the meaning of
-        min, max and mid, see :meth:`scale_data_colormap` for further info.
+        If not None, center of a divergent colormap, changes the meaning of
+        fmin, fmax and fmid.
 
     Returns
     -------
     cmap : matplotlib.ListedColormap
         Color map with transparency channel.
     """
-    ctrl_pts = (min, mid, max)
-
     if center is None:
         # 'hot' or another linear color map
+        ctrl_pts = (fmin, fmid, fmax)
         scale_pts = ctrl_pts
         rgb_cmap = cm.get_cmap(lim_cmap)
         # take 60% of hot color map, so it will be consistent
@@ -54,7 +71,8 @@ def _calculate_lut(lim_cmap, alpha, min, mid, max, center=None):
                 alphas[i] = k * curr_pos + b
     else:
         # 'mne' or another divergent color map
-        scale_pts = (-1 * max, center, max)
+        ctrl_pts = (center + fmin, center + fmid, center + fmax)
+        scale_pts = (center - fmax, center, center + fmax)
         rgb_cmap = lim_cmap
         cmap = rgb_cmap(np.arange(rgb_cmap.N))
         alphas = np.ones(rgb_cmap.N)

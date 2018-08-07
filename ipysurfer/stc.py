@@ -2,7 +2,7 @@ from mne.source_estimate import SourceEstimate
 from mne.utils import _check_subject
 from mne.viz._3d import _handle_time, _limits_to_control_points
 
-from ._utils import _get_subjects_dir
+from .utils import _get_subjects_dir
 from .viz import Brain, TimeViewer
 
 
@@ -38,23 +38,23 @@ def plot_source_estimates(stc, subject=None, surface='inflated', hemi='lh',
     smoothing_steps : int
         The amount of smoothing
     transparent : bool | None
-        If True, use a linear transparency between fmin and fmid.
+        If True, use linear transparency between fmin and fmid control
+        points of a color map.
         None will choose automatically based on colormap type. Has no effect
         with mpl backend.
     alpha : float
         Alpha value to apply globally to the overlay. Has no effect with mpl
         backend.
     time_viewer : bool
-        Display ipybolume time slider.
+        Display time slider.
     subjects_dir : str
         The path to the freesurfer subjects reconstructions.
         It corresponds to Freesurfer environment variable SUBJECTS_DIR.
     figure : ipyvolume.Figure | list | int | None
         If None, a new figure will be created. If multiple views or a
         split view is requested, this must be a list of the appropriate
-        length. If int is provided it will be used to identify the Mayavi
-        figure by it's id or create a new figure with the given id. If an
-        instance of matplotlib figure, mpl backend is used for plotting.
+        length. If int is provided it will be used to identify the figure
+        by its id or create a new figure with the given id.
     views : str | list
         View to use. It must be one of ["lat", "med", "fos", "cau", "dor",
         "ven", "fro", "par"].
@@ -187,8 +187,8 @@ def plot_source_estimates(stc, subject=None, surface='inflated', hemi='lh',
         if len(data) > 0:
             # 'hot' or 'mne' color map
             center = None if isinstance(lim_cmap, str) else 0
-            brain_plot.add_data(data, min=ctrl_pts[0], mid=ctrl_pts[1],
-                                hemi=h, max=ctrl_pts[2], center=center,
+            brain_plot.add_data(data, fmin=ctrl_pts[0], fmid=ctrl_pts[1],
+                                hemi=h, fmax=ctrl_pts[2], center=center,
                                 colormap=lim_cmap, alpha=alpha,
                                 initial_time=initial_time,
                                 time=times, time_label=time_label,

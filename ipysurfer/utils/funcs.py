@@ -170,22 +170,22 @@ def _smoothing_matrix(vertices, adj_mat, smoothing_steps=20, verbose=None):
     """
     logger.info("Updating smoothing matrix, be patient..")
 
-    e = adj_mat.copy()
-    e.data[e.data == 2] = 1
-    n_vertices = e.shape[0]
-    e = e + sparse.eye(n_vertices, n_vertices)
+    amat_cp = adj_mat.copy()
+    amat_cp.data[amat_cp.data == 2] = 1
+    n_vertices = amat_cp.shape[0]
+    amat_cp += sparse.eye(n_vertices, n_vertices)
     idx_use = vertices
     smooth_mat = 1.0
     n_iter = smoothing_steps if smoothing_steps is not None else 1000
     for k in range(n_iter):
-        e_use = e[:, idx_use]
+        amat_use = amat_cp[:, idx_use]
 
-        data1 = e_use * np.ones(len(idx_use))
+        data1 = amat_use * np.ones(len(idx_use))
         idx_use = np.where(data1)[0]
         scale_mat = sparse.dia_matrix((1 / data1[idx_use], 0),
                                       shape=(len(idx_use), len(idx_use)))
 
-        smooth_mat = scale_mat * e_use[idx_use, :] * smooth_mat
+        smooth_mat = scale_mat * amat_use[idx_use, :] * smooth_mat
 
         logger.info("Smoothing matrix creation, step %d" % (k + 1))
         if smoothing_steps is None and len(idx_use) >= n_vertices:

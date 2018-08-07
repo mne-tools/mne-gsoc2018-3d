@@ -27,7 +27,7 @@ views_dict = {'lateral': View(elev=5, azim=0),
               'par': View(elev=5, azim=-110)}
 
 
-class TimeViewer:
+class TimeViewer(object):
     u"""Creates time viewer widget.
 
     Parameters
@@ -105,7 +105,7 @@ class TimeViewer:
         return label
 
 
-class ColorBar:
+class ColorBar(object):
     u"""Helper class for visualizing a color bar.
 
     Parameters
@@ -124,11 +124,11 @@ class ColorBar:
         self._colors = None
 
         if brain.data['center'] is None:
-            dt_min = brain.data['min']
-            dt_max = brain.data['max']
+            dt_min = brain.data['fmin']
+            dt_max = brain.data['fmax']
         else:
-            dt_min = -brain.data['max']
-            dt_max = brain.data['max']
+            dt_min = -brain.data['fmax']
+            dt_max = brain.data['fmax']
 
         self._lut = brain.data['lut']
         self._cbar_data = np.linspace(0, 1, self._lut.N)
@@ -174,8 +174,8 @@ class ColorBar:
                 dt_min = -val_max
                 dt_max = val_max
 
-            self._lut = self._brain.update_lut(min=val_min, mid=val_mid,
-                                               max=val_max)
+            self._lut = self._brain.update_lut(fmin=val_min, fmid=val_mid,
+                                               fmax=val_max)
             k = 1 / (dt_max - dt_min)
             b = 1 - k * dt_max
             self._brain.data['k'] = k
@@ -232,9 +232,9 @@ class ColorBar:
 
     def _add_inputs(self):
         u"""Add inputs and update button."""
-        val_min = self._brain.data['min']
-        val_mid = self._brain.data['mid']
-        val_max = self._brain.data['max']
+        val_min = self._brain.data['fmin']
+        val_mid = self._brain.data['fmid']
+        val_max = self._brain.data['fmax']
 
         if self._brain.data['center'] is None:
             # 'hot' color map

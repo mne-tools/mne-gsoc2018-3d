@@ -4,7 +4,7 @@ import numpy as np
 from numpy.testing import assert_array_equal
 import pytest
 
-from ipysurfer._utils import _check_units, _get_subjects_dir, _fast_cross_3d
+from ipysurfer.utils import _check_units, _get_subjects_dir, _fast_cross_3d
 
 
 def test_check_units():
