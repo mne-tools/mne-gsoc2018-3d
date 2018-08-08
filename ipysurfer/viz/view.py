@@ -159,6 +159,7 @@ class ColorBar(object):
             val_max = self._input_fmax.value
             center = brain.data['center']
             time_idx = brain.data['time_idx']
+            time_arr = brain.data['time']
 
             if not val_min < val_mid < val_max:
                 raise ValueError('Incorrect relationship between' +
@@ -183,7 +184,7 @@ class ColorBar(object):
 
             for v in brain.views:
                 for h in brain.hemis:
-                    if time_idx is None:
+                    if (time_arr is None) or (time_idx is None):
                         act_data = brain.data[h + '_array']
                     else:
                         act_data = brain.data[h + '_array'][:, time_idx]
