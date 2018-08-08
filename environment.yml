@@ -1,0 +1,15 @@
+name: ipysurfer
+channels:
+  - conda-forge
+dependencies:
+  - matplotlib
+  - mne
+  - numpy
+  - nibabel
+  - pydocstyle
+  - pythreejs
+  - scipy
+  - bqplot
+  - pip:
+    - git+git://github.com/maartenbreddels/ipyvolume.git#egg=master
+    - -e .
