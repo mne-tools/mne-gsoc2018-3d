@@ -31,6 +31,7 @@ class Brain(object):
     title : str
         Title for the window.
     cortex : str, tuple, dict, or None
+        Not supported yet.
         Specifies how the cortical surface is rendered. Options:
 
             1. The name of one of the preset cortex styles:
@@ -64,6 +65,7 @@ class Brain(object):
         None (default) will use black or white depending on the value
         of ``background``.
     figure : list of ipyvolume.Figure | None | int
+        Not supported yet.
         If None (default), a new window will be created with the appropriate
         views. For single view plots, the figure can be specified as int to
         retrieve the corresponding Mayavi window.
@@ -83,6 +85,7 @@ class Brain(object):
         mostly for generating images or screenshots, but can be buggy.
         Use at your own risk.
     interaction : str
+        Not supported yet.
         Can be "trackball" (default) or "terrain", i.e. a turntable-style
         camera.
     units : str
@@ -103,16 +106,14 @@ class Brain(object):
                  offscreen=False, interaction=None, units='mm'):
         # surf =  surface
         if cortex != 'classic':
-            raise NotImplementedError('Options for parameter "cortex" ' +
-                                      'is not yet supported.')
+            raise ValueError('Options for parameter "cortex" ' +
+                             'is not yet supported.')
 
         if figure is not None:
-            raise NotImplementedError('figure parameter' +
-                                      'has not been implemented yet.')
+            raise ValueError('figure parameter is not supported yet.')
 
         if interaction is not None:
-            raise NotImplementedError('interaction parameter' +
-                                      'has not been implemented yet.')
+            raise ValueError('"interaction" parameter is not supported.')
 
         self._foreground = foreground
         self._hemi = hemi
@@ -213,7 +214,7 @@ class Brain(object):
             then ``array`` must be have all 3 dimensions.
             If vectors with no time dimension are desired, consider using a
             singleton (e.g., ``np.newaxis``) to create a "time" dimension
-            and pass ``time_label=None``.
+            and pass ``time_label=None``(vector values are not supported).
         fmin : float
             Min value in colormap (uses real min if None).
         fmid : float
@@ -222,15 +223,17 @@ class Brain(object):
         fmax : float
             Max value in colormap (uses real max if None).
         thresh : None or float
+            Not supported yet.
             if not None, values below thresh will not be visible
         center : float or None
             if not None, center of a divergent colormap, changes the meaning of
             fmin, fmax and fmid.
         transparent : bool
+            Not supported yet.
             if True: use a linear transparency between fmin and fmid and make
             values below fmin fully transparent (symmetrically for divergent
             colormaps)
-        colormap : string, list of colors, or array
+        colormap : str, list of colors, or array
             name of matplotlib colormap to use, a list of matplotlib colors,
             or a custom look up table (an n x 4 array coded with RBGA values
             between 0 and 255), the default "auto" chooses a default divergent
@@ -255,20 +258,25 @@ class Brain(object):
             shown. If two hemispheres are being shown, an error will
             be thrown.
         remove_existing : bool
+            Not supported yet.
             Remove surface added by previous "add_data" call. Useful for
             conserving memory when displaying different data in a loop.
         time_label_size : int
+            Not supported yet.
             Font size of the time label (default 14)
         initial_time : float | None
             Time initially shown in the plot. ``None`` to use the first time
             sample (default).
         scale_factor : float | None (default)
+            Not supported yet.
             The scale factor to use when displaying glyphs for vector-valued
             data.
         vector_alpha : float | None
+            Not supported yet.
             alpha level to control opacity of the arrows. Only used for
             vector-valued data. If None (default), ``alpha`` is used.
         verbose : bool, str, int, or None
+            Not supported yet.
             If not None, override default verbose level (see surfer.verbose).
 
         Notes
@@ -286,22 +294,19 @@ class Brain(object):
         if len(array.shape) == 3:
             raise ValueError('Vector values in "array" are not supported.')
         if thresh is not None:
-            raise NotImplementedError('"threshold" parameter is' +
-                                      ' not supported yet.')
+            raise ValueError('"threshold" parameter is not supported yet.')
         if transparent is not None:
-            raise NotImplementedError('"trasparent" is not supported yet.')
+            raise ValueError('"trasparent" is not supported yet.')
         if remove_existing is not None:
-            raise NotImplementedError('"remove_existing" is not' +
-                                      'supported yet.')
+            raise ValueError('"remove_existing" is not supported yet.')
         if time_label_size is not None:
-            raise NotImplementedError('"time_label_size" is not' +
-                                      'supported yet.')
+            raise ValueError('"time_label_size" is not supported yet.')
         if scale_factor is not None:
-            raise NotImplementedError('"scale_factor" is not supported yet.')
+            raise ValueError('"scale_factor" is not supported yet.')
         if vector_alpha is not None:
-            raise NotImplementedError('"vector_alpha" is not supported yet.')
+            raise ValueError('"vector_alpha" is not supported yet.')
         if verbose is not None:
-            raise NotImplementedError('"verbose" is not supported yet.')
+            raise ValueError('"verbose" is not supported yet.')
 
         hemi = self._check_hemi(hemi)
         array = np.asarray(array)

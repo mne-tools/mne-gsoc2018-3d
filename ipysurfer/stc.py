@@ -28,9 +28,11 @@ def plot_source_estimates(stc, subject=None, surface='inflated', hemi='lh',
     hemi : str, 'lh' | 'rh' | 'split' | 'both'
         The hemisphere to display.
     colormap : str | np.ndarray of float, shape(n_colors, 3 | 4)
-        Name of colormap to use or a custom look up table. If array, must
+        Only str type is supported.
+        Name of color map to use or a custom look up table. If array, must
         be (n x 3) or (n x 4) array for with RGB or RGBA values between
-        0 and 255. Default is 'hot'.
+        0 and 255. Default is 'hot'. If equals to 'auto', either 'mne' or
+        'hot' color map will be selected depending on the input data.
     time_label : str | callable | None
         Format of the time label (a format string, a function that maps
         floating point time values to strings, or None for no label). The
@@ -39,9 +41,7 @@ def plot_source_estimates(stc, subject=None, surface='inflated', hemi='lh',
         The amount of smoothing
     transparent : bool | None
         If True, use linear transparency between fmin and fmid control
-        points of a color map.
-        None will choose automatically based on colormap type. Has no effect
-        with mpl backend.
+        points of a color map. Not yet supported.
     alpha : float
         Alpha value to apply globally to the overlay. Has no effect with mpl
         backend.
@@ -51,6 +51,7 @@ def plot_source_estimates(stc, subject=None, surface='inflated', hemi='lh',
         The path to the freesurfer subjects reconstructions.
         It corresponds to Freesurfer environment variable SUBJECTS_DIR.
     figure : ipyvolume.Figure | list | int | None
+        Not yet supported.
         If None, a new figure will be created. If multiple views or a
         split view is requested, this must be a list of the appropriate
         length. If int is provided it will be used to identify the figure
@@ -71,6 +72,7 @@ def plot_source_estimates(stc, subject=None, surface='inflated', hemi='lh',
         Unlike :meth:`stc.plot <mne.SourceEstimate.plot>`, it cannot use
         ``pos_lims``, as the surface plot must show the magnitude.
     cortex : str, tuple, dict, or None
+        Not yet supported.
         Specifies how the cortical surface is rendered. Options:
             1. The name of one of the preset cortex styles:
                ``'classic'`` (default), ``'high_contrast'``,
@@ -138,14 +140,14 @@ def plot_source_estimates(stc, subject=None, surface='inflated', hemi='lh',
     subject = _check_subject(stc.subject, subject, True)
 
     if not isinstance(colormap, str):
-        raise NotImplementedError('Support for "colomap" of a type other' +
-                                  ' than str is not yet implemented.')
+        raise ValueError('Support for "colomap" of a type other' +
+                         ' than str is not yet implemented.')
 
     if cortex != 'classic':
-        raise NotImplementedError('Options for parameter "cortex" ' +
-                                  'is not yet supported.')
+        raise ValueError('Options for parameter "cortex" ' +
+                         'is not yet supported.')
     if figure is not None:
-        raise NotImplementedError('"figure" is not yet supported.')
+        raise ValueError('"figure" is not yet supported.')
 
     if foreground is None:
         foreground = 'black'
