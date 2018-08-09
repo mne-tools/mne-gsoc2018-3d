@@ -28,7 +28,7 @@ def plot_source_estimates(stc, subject=None, surface='inflated', hemi='lh',
     hemi : str, 'lh' | 'rh' | 'split' | 'both'
         The hemisphere to display.
     colormap : str | np.ndarray of float, shape(n_colors, 3 | 4)
-        Only str type is supported.
+        Only str type is currently supported.
         Name of color map to use or a custom look up table. If array, must
         be (n x 3) or (n x 4) array for with RGB or RGBA values between
         0 and 255. Default is 'hot'. If equals to 'auto', either 'mne' or
@@ -140,7 +140,7 @@ def plot_source_estimates(stc, subject=None, surface='inflated', hemi='lh',
     subject = _check_subject(stc.subject, subject, True)
 
     if not isinstance(colormap, str):
-        raise ValueError('Support for "colomap" of a type other' +
+        raise ValueError('Support for "colormap" of a type other' +
                          ' than str is not yet implemented.')
 
     if cortex != 'classic':
