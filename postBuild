@@ -1,0 +1,2 @@
+# Download the sample data
+python3 -c "import mne;  mne.datasets.sample.data_path()"
