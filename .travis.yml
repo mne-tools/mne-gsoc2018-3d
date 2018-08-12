@@ -5,8 +5,9 @@ python:
   - 3.6
 sudo: false
 install:
-  - pip install codespell flake8 pydocstyle
+  - pip install codespell flake8 pydocstyle pytest pytest-cov
   - python setup.py install
 script:
   - make pep
-  - python -c "import mne_g3d"  # just a smoke test for now
+  - pytest # unit tests
+  - python -c "import ipysurfer"  # a smoke test

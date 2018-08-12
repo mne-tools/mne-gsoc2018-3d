@@ -1,13 +1,13 @@
 # Ipysurfer
 
-[![Binder](https://mybinder.org/badge.svg)](https://mybinder.org/v2/gh/mne-tools/mne-gsoc2018-3d/master?filepath=examples%2Fbrain-mesh.ipynb)
+[![Binder](https://mybinder.org/badge.svg)](https://mybinder.org/v2/gh/mne-tools/mne-gsoc2018-3d/master?filepath=examples%2Fipysurfer.ipynb)
 
 This project enables interactive 3D visualization of human brain activity inside Jupyter Notebook.
 It can be regarded as an alternative to `mayavi` and `PySurfer`-based human brain visualization, built on top of `ipyvolume` and `ipywidgets`.
 
 ![Demo brain](doc/images/demo.png)
 
-For a quick demonstration of `ipysurfer`, see [this Binder demo](https://mybinder.org/v2/gh/mne-tools/mne-gsoc2018-3d/master?filepath=examples%2Fbrain-mesh.ipynb).
+For a quick demonstration of `ipysurfer`, see [this Binder demo](https://mybinder.org/v2/gh/mne-tools/mne-gsoc2018-3d/master?filepath=examples%2Fipysurfer.ipynb).
 
 ## Requirements
 

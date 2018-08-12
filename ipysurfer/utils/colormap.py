@@ -3,49 +3,26 @@ from matplotlib.colors import ListedColormap
 import numpy as np
 
 
-def offset_hemi(vertices, hemi, offset=0.0):
-    u"""Offset hemispere.
-
-    Parameters
-    ----------
-    vertices : numpy.array
-        Array of hemisphere vertex (x, y, z) coordinates, of size
-        number_of_vertices x 3.
-    hemi : {'lh', 'rh'}
-        Which hemisphere to offset.
-    offset : float | int, optional
-        If 0.0, the surface will be offset such that the medial
-        wall is aligned with the origin. If not 0.0, an
-        additional offset will be used.
-
-    Returns
-    -------
-    vertices : numpy.array
-        Array of offset hemisphere vertex (x, y, z) coordinates, of size
-        number_of_vertices x 3.
-    """
-    hemis = ('lh', 'rh')
-
-    if hemi not in hemis:
-        raise ValueError('hemi should be either "lh" or "rh", given value {0}'.
-                         format(hemi))
-
-    if (not isinstance(offset, float)) and (not isinstance(offset, int)):
-        raise ValueError('offset should either float or int, given type {0}'.
-                         format(type(offset).__name__))
-
-    vertices = vertices.copy()
-
-    if hemi == hemis[0]:
-        vertices[:, 0] -= (np.max(vertices[:, 0]) + offset)
-    else:
-        vertices[:, 0] -= (np.min(vertices[:, 0]) + offset)
-
-    return vertices
-
-
-def _calculate_cmap(lim_cmap, alpha, ctrl_pts, scale_pts):
+def _calculate_lut(lim_cmap, alpha, fmin, fmid, fmax, center=None):
     u"""Transparent color map calculation.
+
+    A colormap may be sequential or divergent. When the colormap is
+    divergent indicate this by providing a value for 'center'. The
+    meanings of fmin, fmid and fmax are different for sequential and
+    divergent colormaps. A sequential colormap is characterised by::
+
+        [fmin, fmid, fmax]
+
+    where fmin and fmax define the edges of the colormap and fmid will be
+    the value mapped to the center of the originally chosen colormap.
+    A divergent colormap is characterised by::
+
+        [center-fmax, center-fmid, center-fmin, center,
+            center+fmin, center+fmid, center+fmax]
+
+    i.e., values between center-fmin and center+fmin will not be shown
+    while center-fmid will map to the middle of the first half of the
+    original colormap and center-fmid to the middle of the second half.
 
     Parameters
     ----------
@@ -54,18 +31,25 @@ def _calculate_cmap(lim_cmap, alpha, ctrl_pts, scale_pts):
     alpha : float
         Alpha value to apply globally to the overlay. Has no effect with mpl
         backend.
-    ctrl_pts : tuple(float)
-        Color map control points.
-    scale_pts : tuple(float)
-        Data scale control points.
+    fmin : float
+        Min value in colormap.
+    fmid : float
+        Intermediate value in colormap.
+    fmax : float
+        Max value in colormap.
+    center : float or None
+        If not None, center of a divergent colormap, changes the meaning of
+        fmin, fmax and fmid.
 
     Returns
     -------
     cmap : matplotlib.ListedColormap
         Color map with transparency channel.
     """
-    if isinstance(lim_cmap, str):
-        # 'hot' color map
+    if center is None:
+        # 'hot' or another linear color map
+        ctrl_pts = (fmin, fmid, fmax)
+        scale_pts = ctrl_pts
         rgb_cmap = cm.get_cmap(lim_cmap)
         # take 60% of hot color map, so it will be consistent
         # with mayavi plots
@@ -86,7 +70,9 @@ def _calculate_cmap(lim_cmap, alpha, ctrl_pts, scale_pts):
             elif (curr_pos < ctrl_pts[1]):
                 alphas[i] = k * curr_pos + b
     else:
-        # mne color map
+        # 'mne' or another divergent color map
+        ctrl_pts = (center + fmin, center + fmid, center + fmax)
+        scale_pts = (center - fmax, center, center + fmax)
         rgb_cmap = lim_cmap
         cmap = rgb_cmap(np.arange(rgb_cmap.N))
         alphas = np.ones(rgb_cmap.N)
