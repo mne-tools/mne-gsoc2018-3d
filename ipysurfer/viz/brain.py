@@ -187,7 +187,7 @@ class Brain(object):
         self._add_title()
 
     def add_data(self, array, fmin=None, fmax=None, thresh=None,
-                 colormap="auto", alpha=1,
+                 colormap="hot", alpha=1,
                  vertices=None, smoothing_steps=None, time=None,
                  time_label="time index=%d", colorbar=True,
                  hemi=None, remove_existing=None, time_label_size=None,
