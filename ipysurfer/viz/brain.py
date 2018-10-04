@@ -343,6 +343,15 @@ class Brain(object):
         if fmid is None:
             fmid = (fmin + fmax) / 2.
         _check_limits(fmin, fmid, fmax, extra='')
+
+        # choose default colormaps (REMEMBER to change doc, e.g., in
+        # Brain.add_data, when changing these defaults)
+        if isinstance(colormap, string_types) and colormap == "auto":
+            if center is None:
+                colormap = "rocket"
+            else:
+                colormap = "icefire"
+
         self._data['alpha'] = alpha
         self._data['colormap'] = colormap
         self._data['center'] = center
