@@ -187,7 +187,7 @@ class Brain(object):
         self._add_title()
 
     def add_data(self, array, fmin=None, fmax=None, thresh=None,
-                 colormap="hot", alpha=1,
+                 colormap="auto", alpha=1,
                  vertices=None, smoothing_steps=None, time=None,
                  time_label="time index=%d", colorbar=True,
                  hemi=None, remove_existing=None, time_label_size=None,
@@ -343,6 +343,15 @@ class Brain(object):
         if fmid is None:
             fmid = (fmin + fmax) / 2.
         _check_limits(fmin, fmid, fmax, extra='')
+
+        # choose default colormaps (REMEMBER to change doc, e.g., in
+        # Brain.add_data, when changing these defaults)
+        if isinstance(colormap, string_types) and colormap == "auto":
+            if center is None:
+                colormap = "rocket"
+            else:
+                colormap = "icefire"
+
         self._data['alpha'] = alpha
         self._data['colormap'] = colormap
         self._data['center'] = center
